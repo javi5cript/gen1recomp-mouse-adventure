@@ -36,8 +36,22 @@ package.preload["src.battle.BattleState"] = function()
   return { StatBox = {} }
 end
 package.preload["src.ui.DexEntryMenu"] = function()
-  local M = {}; M.__index = M; function M.draw() end; return M
+  return assert(load("local DexEntryMenu = {}; DexEntryMenu.__index = DexEntryMenu\n"
+    .. DEX_METHODS .. "\nfunction DexEntryMenu.draw() end\nreturn DexEntryMenu"))()
 end
+package.preload["src.ui.PartyMenu"] = function()
+  return assert(load([[
+    local Runtime, Strings, Screens = ...
+    local PartyMenu = {}; PartyMenu.__index = PartyMenu
+  ]] .. PARTY_METHODS .. "\nfunction PartyMenu.draw() end\nreturn PartyMenu"))(
+    require("src.mods.Runtime"), require("src.core.Strings"),
+    {push=function(g,screen,mon) g.stack:push({screen=screen,mon=mon}) end})
+end
+package.preload["src.world.PikachuFollower"] = function()
+  return {isFollowingDisabled=function() return false end}
+end
+package.preload["src.ui.MoveSelectMenu"] = function() return {draw=function() end} end
+package.preload["src.ui.MoveLearnMenu"] = function() return {draw=function() end} end
 package.preload["src.core.Strings"] = function()
   return function(text, ...) return select("#",...)>0 and string.format(text,...) or text end
 end
@@ -64,24 +78,65 @@ package.preload["src.render.SpriteRenderer"] = function()
   return { new = function() return {} end }
 end
 local tilted, projected, voxelLevel = false, false, 3
+local projectionCase, draws, wheelBehavior, previousKeys, frameCase
+local currentFont, fontStack, fontDPI, fontsCreated
+local function testFont(size)
+  return {size=size, getWidth=function(_,text) return #text*7*size/12 end,
+    getHeight=function() return size end, release=function(self) self.released=true end}
+end
 package.preload["src.render.Tilt"] = function()
-  return { active = function() return tilted end }
+  return { active = function() return tilted end,
+    groundPoint=function(x,y,w,h)
+      projectionCase.observed = {x,y,w,h}
+      if projectionCase.project then return projectionCase.project(x,y,w,h) end
+      return projectionCase.x, projectionCase.y
+    end }
 end
 package.preload["src.render.Pipelines"] = function()
   return {
     worldPipeline = function() return projected and "voxel" or nil end,
     level = function(id) return id == "voxel" and voxelLevel or 0 end,
+    drawWorld=function(_, ctx)
+      if not projectionCase.skipFx then
+        ctx.drawFx(function(x,y)
+          projectionCase.observed = {x,y}
+          local px,py,depth=projectionCase.x,projectionCase.y,projectionCase.depth or 1
+          if projectionCase.project then px,py,depth=projectionCase.project(x,y) end
+          local aa=projectionCase.aa or 1
+          return px*aa,py*aa,depth
+        end, (projectionCase.scale or 4)*(projectionCase.aa or 1))
+      end
+      return projectionCase.canvas
+    end,
   }
 end
 love = { graphics = {
   getColor = function() return 1, 1, 1, 1 end,
-  setColor = function() end, line = function() end,
-  push=function() end, pop=function() end, origin=function() end,
+  setColor = function() end, line = function(...) draws.lines[#draws.lines+1] = {...} end,
+  ellipse=function(...) draws.ellipses[#draws.ellipses+1] = {...} end,
+  setLineWidth=function(w) draws.widths[#draws.widths+1] = w end,
+  push=function() fontStack[#fontStack+1]=currentFont end,
+  pop=function() currentFont=table.remove(fontStack) end, origin=function() end,
   setCanvas=function() end, setShader=function() end, setScissor=function() end,
-  rectangle=function() end, print=function() end, getDimensions=function() return 960,720 end,
-  getFont=function() return {
-    getWidth=function(_,text) return #text*7 end, getHeight=function() return 12 end,
-  } end,
+  getCanvas=function()
+    if not projectionCase or projectionCase.noCanvas then return nil end
+    local canvas,aa=projectionCase.canvas,projectionCase.aa or 1
+    return {getWidth=function() return canvas:getWidth()*aa end,
+      getHeight=function() return canvas:getHeight()*aa end}
+  end,
+  rectangle=function(...) draws.rects[#draws.rects+1] = {...} end,
+  print=function(...)
+    local t={...}; t.font=currentFont; draws.text[#draws.text+1]=t
+  end,
+  getDimensions=function() return 960,720 end,
+  getFont=function() return currentFont end,
+  setFont=function(font) currentFont=font end,
+  getDPIScale=function() return fontDPI end,
+  newFont=function(size,hinting,dpi)
+    local font=testFont(size); font.dpi=dpi; font.hinting=hinting
+    fontsCreated[#fontsCreated+1]=font
+    return font
+  end,
 } }
 
 local Player = require("src.world.Player")
@@ -90,7 +145,7 @@ local Collision = require("src.world.Collision")
 local Camera = require("src.render.Camera")
 local Transition = require("src.render.Transition")
 local Hooks = require("src.mods.Hooks")
-local game, ow, hooks, options, events, holds, steps, rect, origin, registry
+local game, ow, hooks, options, events, holds, steps, rect, origin, registry, mod
 local noop = function() end
 local function eq(a, b, why)
   assert(a == b, (why or "mismatch") .. ": " .. tostring(a) .. " != " .. tostring(b))
@@ -115,16 +170,38 @@ local function render()
     x = r.wipeWox + (ow.player.px + 8 - math.floor(ow.camera.x)) * r.wipeSx,
     y = r.wipeWoy + (ow.player.py + 4 - math.floor(ow.camera.y)) * r.wipeSy,
   }
+  if projectionCase then
+    if projectionCase.mode == "voxel" then
+      r.worldOverride = require("src.render.Pipelines").drawWorld("voxel",
+        {state=ow,scale=4,drawFx=function() projectionCase.fxCalled=true end})
+      if projectionCase.rejected then r.worldOverride = nil end
+    else
+      r:drawTiltedWorld({}, 3, 2, 17, 29)
+    end
+  end
+  if frameCase then r.worldActive=frameCase.worldActive end
+  if r.endFrame then r:endFrame() end
   hooks:call("render.hud", noop, game, rect)
 end
 local function setup()
   warnings, tilted, projected, voxelLevel = {}, false, false, 3
+  projectionCase, wheelBehavior, previousKeys, frameCase = nil, nil, {}, nil
+  currentFont, fontStack, fontDPI, fontsCreated = testFont(12), {}, 1, {}
+  draws = {lines={},ellipses={},widths={},rects={},text={}}
+  package.loaded["src.render.Pipelines"] = nil
   holds, options, events, steps, registry = {}, {}, {}, {}, {}
   hooks = Hooks.new()
   game = { data = { sprites = { player = {} }, field = {} }, save = {},
     options = {textSpeed=1},
     input = setmetatable({}, { __index = Input }),
-    renderer = { wipeWox = 0, wipeWoy = 0, wipeSx = 3, wipeSy = 3 } }
+    renderer = { wipeWox = 0, wipeWoy = 0, wipeSx = 3, wipeSy = 3,
+      drawTiltedWorld=function() return not projectionCase.rejected end,
+      endFrame=function(self) self.worldOverride=nil; self.worldActive=false end,
+      worldCanvas={getWidth=function() return 160 end,getHeight=function() return 144 end} } }
+  game.wheelmoved=function(self, ...)
+    if wheelBehavior then return wheelBehavior(self, ...) end
+  end
+  game.keypressed=function(_,key) previousKeys[#previousKeys+1]=key end
   package.loaded["src.core.Game"] = game
   game.input:init()
   ow = { isOverworld = true, map = map("start"),
@@ -159,7 +236,7 @@ local function setup()
     return true
   end
   rect = { width = 960, height = 720 }
-  local mod = { hooks = hooks, options = {}, events = {}, input = {}, world = {},
+  mod = { hooks = hooks, options = {}, events = {}, input = {}, world = {},
     log = { info = noop, warn = function(...) warnings[#warnings + 1] = {...} end } }
   function mod.options:define(rows)
     for _, row in ipairs(rows) do options[row.key] = row.default end
@@ -190,6 +267,7 @@ local function setup()
   end
   function mod.world:overworld() return ow end
   assert(load(MOD_SOURCE, "click_to_move"))()(mod)
+  events["game.ready"]({game=game})
   render()
 end
 local function pointer(phase, dx, dy, changes)
@@ -218,6 +296,9 @@ local function tick(n)
       state:update(1/60)
     end
     render()
+  end
+  if #warnings > 0 then
+    for _, value in ipairs(warnings[1]) do print(tostring(value)) end
   end
   eq(#warnings, 0, "unexpected mod/hook warning")
 end
@@ -451,10 +532,10 @@ local function drawDock()
   end, {width=960,height=720})
   hooks:call("render.window", noop, game, {})
 end
-local function clickDock(index, phase, count)
-  local cols=math.ceil((count or 10)/2)
+local function clickDock(index, phase)
+  local cols=6
   local x=((index-1)%cols+0.5)*960/cols
-  local y=620+math.floor((index-1)/cols)*39+18
+  local y=608+math.floor((index-1)/cols)*32+16
   return uiPointer(phase or "pressed",x,y,1,true)
 end
 local Menu=require("src.ui.Menu")
@@ -824,7 +905,7 @@ test("action dock reserves space without covering dialogue",function()
   local result=hooks:call("render.viewport",function()
     return {x=17,y=29,width=900,height=660}
   end,{width=960,height=720})
-  eq(result.x,17); eq(result.y,29); eq(result.height,560); assert(result.capture)
+  eq(result.x,17); eq(result.y,29); eq(result.height,548); assert(result.capture)
 end)
 test("dock menu works outside game viewport",function()
   drawDock(); assert(clickDock(3)); clickDock(3,"released"); tick(2)
@@ -856,26 +937,26 @@ local function catchingFixture()
 end
 test("Wilds throw uses configured combo and normal release",function()
   local c=catchingFixture()
-  drawDock(); clickDock(10,nil,12)
+  drawDock(); clickDock(11)
   assert(game.input:isDown("select")); assert(game.input:isDown("a"))
-  clickDock(10,"released",12)
+  clickDock(11,"released")
   noHold(); eq(c.cancelled,0)
 end)
 test("right-click cancels Wilds charge without releasing a throw",function()
   local c=catchingFixture()
-  drawDock(); clickDock(10,nil,12)
+  drawDock(); clickDock(11)
   uiPointer("pressed",560,677,2,true)
   noHold(); eq(c.cancelled,1)
 end)
 test("dragging out of dock cancels Wilds charge",function()
   local c=catchingFixture()
-  drawDock(); clickDock(10,nil,12)
+  drawDock(); clickDock(11)
   uiPointer("moved",560,600,1,true)
   noHold(); eq(c.cancelled,1)
 end)
 test("Wilds next ball invokes owned exported cycler",function()
   local c=catchingFixture()
-  drawDock(); clickDock(11,nil,12); clickDock(11,"released",12); tick(2)
+  drawDock(); clickDock(12); clickDock(12,"released"); tick(2)
   eq(c.cycled,1)
 end)
 test("existing higher-priority pointer handlers keep game clicks",function()
@@ -890,7 +971,7 @@ local Battle=assert(load([[
   local WideBattle={navigate=function() return nil end}
   local BattleState={}
 ]]..BATTLE_UPDATE_SOURCE.."\n"..BATTLE_UPDATEQUEUE_SOURCE.."\n"
-  ..BATTLE_BEGINMSGLINE_SOURCE.."\nreturn BattleState"))(
+  ..BATTLE_BEGINMSGLINE_SOURCE.."\n"..BATTLE_OPENPARTY_SOURCE.."\nreturn BattleState"))(
   require("src.core.Timing"),require("src.mods.Runtime"),{firstHealthy=function() return true end})
 Battle.__index=Battle
 package.loaded["src.battle.BattleState"]=Battle
@@ -1039,6 +1120,149 @@ test("modern party cards select only the clicked cursor",function()
     update=function(self) if game.input:wasPressed("a") then self.chosen=self.index end end}
   uiFrame(state); clickUI(120,30); eq(state.chosen,2)
 end)
+local function partyFixture(style, extra)
+  local PartyMenu=require("src.ui.PartyMenu")
+  local party={{id="ONE",hp=20,moves={}}, {id="TWO",hp=20,moves={}}}
+  local battle={isBattle=true,phase="menu",playerParty=party,player={mon=party[1],name="ONE"}}
+  local result={calls=0}
+  function battle:playerPartyView() return self.playerParty end
+  function battle:ui(create) game.stack:push(create()) end
+  function battle:buildScreen(name,opts)
+    eq(name,"PartyMenu")
+    opts.onCancel=function() result.cancelled=true end
+    for key,value in pairs(extra or {}) do opts[key]=value end
+    return PartyMenu.new(game,opts)
+  end
+  function battle:resolveSwitch(mon) result.calls=result.calls+1; result.mon=mon end
+  function battle:romText(key,text,...)
+    result.refusal=key
+    return string.format(text,...)
+  end
+  game.save.party=party
+  game.stack:push(battle)
+  Battle.openParty(battle)
+  local state=game.stack:top()
+  if style=="modern" then
+    state.modernPartyUI=true
+    state.modernPartyLayoutInfo=function()
+      return {width=160,footerY=136,capacity=6,columns=2,rows=3,contentHeight=120}
+    end
+  elseif style=="wild" then
+    state.draw=noop
+    state.gen1wildTheme="party"
+    registry.gen1_wild_ui={exports={features={gen1party={exports={
+      geometry={ROW_H=16,BODY_TOP=24,BODY_BOTTOM=119}}}}}}
+  end
+  uiFrame()
+  return state,result
+end
+local function openPartyPopup(style,state)
+  if style=="modern" then clickUI(120,30)
+  else clickUI(40,style=="wild" and 44 or 28) end
+  eq(state.index,2); assert(state.submenu); eq(state.subItems[1].action,"battle_switch")
+  tick(2)
+end
+local function popupPoint(style,row)
+  return style=="modern" and 60 or 112,
+    (style=="modern" and 54 or style=="wild" and 88 or 96)
+      +(row-1)*(style=="modern" and 12 or 16)
+end
+for _,style in ipairs({"native","modern","wild"}) do
+  test(style.." battle party popup switches through native A",function()
+    local state,result=partyFixture(style)
+    openPartyPopup(style,state)
+    local x,y=popupPoint(style,1)
+    assert(clickUI(x,y)); eq(result.calls,1); eq(result.mon,state.party[2])
+    assert(game.stack:top()~=state)
+    tick(2); noHold(); eq(result.calls,1)
+  end)
+  test(style.." battle party popup STATS does not switch",function()
+    local state,result=partyFixture(style)
+    openPartyPopup(style,state)
+    clickUI(popupPoint(style,2))
+    eq(game.stack:top().screen,"SummaryMenu")
+    eq(game.stack:top().mon,state.party[2]); eq(result.calls,0)
+  end)
+  test(style.." battle party popup CANCEL does not switch",function()
+    local state,result=partyFixture(style)
+    openPartyPopup(style,state)
+    clickUI(popupPoint(style,3))
+    assert(result.cancelled); eq(result.calls,0); assert(game.stack:top()~=state)
+  end)
+  for _,invalid in ipairs({"active","fainted"}) do
+    test(style.." party SWITCH preserves native "..invalid.." refusal",function()
+      local state,result=partyFixture(style)
+      openPartyPopup(style,state)
+      if invalid=="active" then state.index=1 else state.party[2].hp=0 end
+      render()
+      clickUI(popupPoint(style,1))
+      eq(result.calls,0)
+      eq(result.refusal,invalid=="active" and "_AlreadyOutText" or "_NoWillText")
+      assert(game.stack:top()~=state); eq(state.submenu,nil)
+      eq(game.stack.states[#game.stack.states-1],state)
+    end)
+  end
+  local changes={
+    selection=function(s) s.index=1 end,
+    member=function(s) s.party[2]={id="THREE",hp=20,moves={}} end,
+    party=function(s) s.party={s.party[1],s.party[2]} end,
+    list=function(s) s.subItems={s.subItems[1],s.subItems[2],s.subItems[3]} end,
+    action=function(s) s.subItems[1].action="cancel" end,
+    cursor=function(s) s.subIndex=2 end,
+    closed=function(s) s.submenu=nil end,
+    phase=function(s) s.battle.phase="menu" end,
+    callback=function(s) s.onSwitch=function() error("stale callback") end end,
+    physical=function() game.input:sourcePress("left","keyboard") end,
+    focus=function() uiPointer("cancelled",0,0) end,
+  }
+  for name,change in pairs(changes) do
+    test(style.." pending party switch cancels on changed "..name,function()
+      local state,result=partyFixture(style)
+      openPartyPopup(style,state)
+      local x,y=popupPoint(style,1)
+      assert(uiPointer("pressed",80+x*3,30+y*2))
+      uiPointer("released",80+x*3,30+y*2)
+      change(state); tick(2)
+      eq(result.calls,0); assert(not result.cancelled); noHold()
+      assert(not game.input:wasPressed("a"))
+    end)
+  end
+  test(style.." party popup blocks clicks on cards behind it",function()
+    local state,result=partyFixture(style)
+    openPartyPopup(style,state)
+    eq(clickUI(40,30),false); eq(state.index,2); eq(result.calls,0)
+  end)
+  test(style.." forced replacement still selects without a popup",function()
+    local state,result=partyFixture(style,{forceSwitch=true})
+    if style=="modern" then clickUI(120,30)
+    else clickUI(40,style=="wild" and 44 or 28) end
+    eq(result.calls,1); eq(result.mon,state.party[2]); assert(not state.submenu)
+  end)
+end
+test("unknown party redraw does not receive guessed native popup targets",function()
+  local state,result=partyFixture("native")
+  openPartyPopup("native",state)
+  state.draw=noop; render()
+  eq(clickUI(112,96),false); eq(result.calls,0)
+end)
+test("Gen1Party carry and unknown geometry get no party click targets",function()
+  local state,result=partyFixture("wild")
+  state.moveFrom=1; render()
+  eq(clickUI(40,44),false); eq(result.calls,0)
+  state.moveFrom=nil
+  registry.gen1_wild_ui.exports.features.gen1party.exports.geometry.ROW_H=20
+  render(); eq(clickUI(40,44),false); eq(result.calls,0)
+end)
+test("native field submenu follows dynamic height and field-move width",function()
+  local state,result=partyFixture("native")
+  openPartyPopup("native",state)
+  state.subItems={
+    {label="SOFTBOILED",action="softboiled"},{label="STATS",action="stats"},
+    {label="SWITCH",action="switch"},{label="CANCEL",action="cancel"}}
+  render()
+  clickUI(72,130)
+  assert(result.cancelled); eq(result.calls,0)
+end)
 test("modern Pokedex visible rows match scrolled items",function()
   game.renderer.uiSize=function() return 160,144 end
   local state={modernPokedexUI=true,index=1,scroll=1,items={{},{},{},{}},
@@ -1067,4 +1291,567 @@ end)
 test("other keys never toggle the steering guide",function()
   game:keypressed("x"); eq(options.marker,true)
 end)
+
+local function hasText(fragment)
+  for _, text in ipairs(draws.text) do
+    if text[1]:find(fragment,1,true) then return true end
+  end
+  return false
+end
+test("new gesture and input behaviors are opt-in",function()
+  for _, key in ipairs({"click_hold","dialogue_buffer","projected_anchor","four_way"}) do
+    eq(options[key],false)
+  end
+  eq(options.wheel_lists,true,"wheel navigation is enabled by default")
+end)
+test("guide key can be changed without claiming the old binding",function()
+  options.guide_key="h"
+  game:keypressed("g"); eq(options.marker,true); eq(previousKeys[1],"g")
+  game:keypressed("h"); eq(options.marker,false); eq(#previousKeys,1)
+end)
+test("guide key yields to native rebound controls and text handlers",function()
+  game.input:applyBindings({a={key="g"}})
+  game:keypressed("g"); eq(options.marker,true); eq(previousKeys[1],"g")
+  game.input:applyBindings(nil)
+  ow.onKeyPressed=noop
+  game:keypressed("g"); eq(options.marker,true); eq(#previousKeys,2)
+end)
+test("real engine options without a setter use a visible session override",function()
+  mod.options.set=nil
+  game:keypressed("g"); eq(options.marker,true)
+  pointer("pressed"); tick()
+  eq(#draws.lines,0)
+  drawDock(); assert(hasText("GUIDE OFF")); assert(hasText("this session"))
+  options.marker=false; render()
+  game:keypressed("g")
+  render(); assert(#draws.lines>0)
+end)
+for _, mode in ipairs({"throws","returns false","does not persist"}) do
+  test("guide setter failure is visible: "..mode,function()
+    mod.options.set=function()
+      if mode=="throws" then error("fixture setter failure") end
+      return mode=="does not persist"
+    end
+    game:keypressed("g"); eq(#warnings,1); warnings={}
+    drawDock(); assert(hasText("Could not update settings")); assert(hasText("GUIDE OFF"))
+  end)
+end
+test("guide persistence accepts nil success and reports failed saves",function()
+  game.save.options={}
+  game.writeOptions=function() end
+  game:keypressed("g"); eq(#warnings,0)
+  game.writeOptions=function() error("fixture disk failure") end
+  game:keypressed("g"); eq(#warnings,1); warnings={}
+  drawDock(); assert(hasText("settings save failed"))
+end)
+test("guide footer works while a menu owns the keyboard",function()
+  game.stack:push({menu=true}); drawDock()
+  uiPointer("pressed",900,705,1,true); uiPointer("released",900,705,1,true)
+  tick(2); eq(options.marker,false); assert(not game.input:wasPressed("a"))
+end)
+test("four-way steering never alternates diagonal components",function()
+  options.four_way=true
+  pointer("pressed",70,60); tick(90)
+  assert(#steps>2)
+  for _, dir in ipairs(steps) do eq(dir,"right") end
+end)
+test("precision guide shows a scaled dead zone without suggesting movement",function()
+  options.precision_guide=true
+  pointer("pressed",1,1); render()
+  eq(#draws.lines,0); assert(hasText("PAUSED"))
+  local e=draws.ellipses[#draws.ellipses]
+  eq(e[4],18); eq(e[5],18)
+  tick(20); eq(#steps,0)
+end)
+test("high-contrast guide draws configured width above a black outline",function()
+  options.guide_contrast=true; options.guide_width=3
+  pointer("pressed"); render()
+  eq(draws.widths[#draws.widths-1],6); eq(draws.widths[#draws.widths],3)
+  eq(#draws.lines,4)
+end)
+local function projectionFixture(mode)
+  tilted, projected = mode=="tilt", mode=="voxel"
+  options.projected_anchor=true
+  projectionCase={mode=mode,x=240,y=300,scale=4,
+    canvas={getWidth=function() return 1920 end,getHeight=function() return 2160 end}}
+  game.renderer.frameRects=function()
+    return {vux=10,vuy=20,vuw=960,vuh=720,dpiX=2,dpiY=3,
+      uox=0,uoy=0,Ux=3,Uy=3,uiw=160,uih=144}
+  end
+end
+test("voxel anchor uses actual composite DPI and survives endFrame clearing the canvas",function()
+  projectionFixture("voxel")
+  render(); assert(projectionCase.fxCalled); eq(game.renderer.worldOverride,nil)
+  eq(projectionCase.observed[1],ow.player.px+8); eq(projectionCase.observed[2],ow.player.py+16)
+  pointer("pressed",nil,nil,{gameX=400,gameY=120}); render()
+  eq(draws.lines[#draws.lines-1][1],130); eq(draws.lines[#draws.lines-1][2],120)
+end)
+for _, aa in ipairs({1,2,3}) do
+  test("voxel projected anchor accounts for antialiasing factor "..aa,function()
+    projectionFixture("voxel"); projectionCase.aa=aa
+    render()
+    pointer("pressed",nil,nil,{gameX=400,gameY=120}); render()
+    eq(draws.lines[#draws.lines-1][1],130); eq(draws.lines[#draws.lines-1][2],120)
+  end)
+end
+test("tilt anchor samples native ground projection and actual render origin",function()
+  projectionFixture("tilt"); projectionCase.x=60; projectionCase.y=80
+  render()
+  eq(projectionCase.observed[1],ow.player.px+8-math.floor(ow.camera.x))
+  eq(projectionCase.observed[3],160)
+  pointer("pressed",nil,nil,{gameX=400,gameY=189}); render()
+  eq(draws.lines[#draws.lines-1][1],197); eq(draws.lines[#draws.lines-1][2],189)
+end)
+for _, mode in ipairs({"missing","rejected","nonfinite","noCanvas"}) do
+  test("voxel projection falls back safely when "..mode,function()
+    projectionFixture("voxel"); render()
+    if mode=="missing" then projectionCase.skipFx=true
+    elseif mode=="rejected" then projectionCase.rejected=true
+    elseif mode=="noCanvas" then projectionCase.noCanvas=true
+    else projectionCase.x=0/0 end
+    pointer("pressed",nil,nil,{gameX=700,gameY=360}); render()
+    eq(draws.lines[#draws.lines-1][1],480); eq(draws.lines[#draws.lines-1][2],360)
+    eq(#warnings,0)
+  end)
+end
+test("projected anchors are not reused across frames or game-ready",function()
+  projectionFixture("voxel"); render()
+  projectionCase=nil
+  pointer("pressed",nil,nil,{gameX=700,gameY=360}); render()
+  eq(draws.lines[#draws.lines-1][1],480)
+  events["game.ready"]({game=game}); noHold(); tick()
+end)
+local function deferredFixture()
+  projected=true; options.click_hold=true
+  local npc,calls=worldFixture(1,0)
+  render()
+  pointer("pressed",nil,nil,{gameX=700,gameY=360})
+  return npc,calls
+end
+test("short projected click interacts on release, never on press",function()
+  local npc,calls=deferredFixture()
+  tick(4); eq(#calls,0); eq(#steps,0)
+  pointer("released",nil,nil,{gameX=700,gameY=360})
+  tick(5); eq(#calls,1); eq(calls[1],npc); eq(#steps,0)
+end)
+test("projected long hold transfers to steering without talking",function()
+  local _,calls=deferredFixture()
+  tick(14)
+  pointer("moved",nil,nil,{gameX=480,gameY=580}); tick(75)
+  assert(#steps>0); eq(#calls,0)
+  pointer("released"); noHold()
+end)
+test("projected drag starts steering before the hold threshold",function()
+  local _,calls=deferredFixture()
+  pointer("moved",nil,nil,{gameX=480,gameY=580}); tick(2)
+  assert(#steps>0); eq(#calls,0)
+end)
+for _, reason in ipairs({"physical","right","focus","state","map","target","camera","level","leave"}) do
+  test("deferred interaction cancels on "..reason,function()
+    local npc,calls=deferredFixture()
+    if reason=="physical" then game.input:sourcePress("b","keyboard:b")
+    elseif reason=="right" then pointer("pressed",nil,nil,{button=2})
+    elseif reason=="focus" then pointer("cancelled")
+    elseif reason=="state" then game.stack:push({menu=true})
+    elseif reason=="map" then ow.map=map("changed")
+    elseif reason=="target" then npc.hidden=true
+    elseif reason=="camera" then projected=false
+    elseif reason=="level" then voxelLevel=4
+    else pointer("moved",nil,nil,{insideGame=false}) end
+    tick(2)
+    pointer("released",nil,nil,{gameX=700,gameY=360}); tick(15)
+    eq(#calls,0); eq(#steps,0)
+    if reason=="physical" then game.input:sourceRelease("b","keyboard:b") end
+    noHold()
+  end)
+end
+local function wheelFixture()
+  options.wheel_lists=true
+  local menu=Menu.new(game,{{label="ONE"},{label="TWO"},{label="THREE"},{label="FOUR"}},
+    {tx=0,ty=0,tw=20})
+  uiFrame(menu)
+  uiPointer("moved",100,100)
+  return menu
+end
+test("wheel steps native menu rows with neutral polls and never confirms",function()
+  local menu=wheelFixture()
+  game:wheelmoved(0,-2); tick(4)
+  eq(menu.index,3); eq(game.stack:top(),menu); noHold()
+  game:wheelmoved(0,1); tick(2); eq(menu.index,2)
+  assert(not game.input:wasPressed("a"))
+end)
+test("wheel fractional events accumulate without changing zoom or confirming",function()
+  local menu=wheelFixture()
+  game:wheelmoved(0,-0.4); tick(); eq(menu.index,1)
+  game:wheelmoved(0,-0.6); tick(2); eq(menu.index,2)
+end)
+test("separate wheel notches receive distinct native key presses",function()
+  local menu=wheelFixture()
+  game:wheelmoved(0,-1); tick(); eq(menu.index,2)
+  game:wheelmoved(0,-1); tick(); eq(menu.index,2)
+  tick(2); eq(menu.index,3); noHold()
+end)
+test("physical input clears fractional wheel intent as well as whole steps",function()
+  local menu=wheelFixture()
+  game:wheelmoved(0,-0.5)
+  game.input:sourcePress("left","keyboard:left"); tick()
+  game.input:sourceRelease("left","keyboard:left"); tick()
+  game:wheelmoved(0,-0.5); tick(2); eq(menu.index,1)
+end)
+test("wheel is opt-in and yields the original return value",function()
+  local menu=wheelFixture()
+  options.wheel_lists=false
+  wheelBehavior=function() return "original" end
+  eq(game:wheelmoved(0,-1),"original"); tick(2); eq(menu.index,1)
+end)
+for _, mode in ipairs({"consumed","cursor","own handler","physical","outside","state","items","reorder","focus","click","disabled"}) do
+  test("wheel queue yields or cancels on "..mode,function()
+    local menu=wheelFixture()
+    if mode=="consumed" then wheelBehavior=function() return true end
+    elseif mode=="cursor" then wheelBehavior=function() menu.index=2 end
+    elseif mode=="own handler" then menu.onWheelMoved=noop
+    elseif mode=="outside" then uiPointer("moved",900,700,1,true)
+    end
+    game:wheelmoved(0,-3)
+    if mode=="physical" then game.input:sourcePress("b","keyboard:b")
+    elseif mode=="state" then game.stack:push({menu=true})
+    elseif mode=="items" then menu.items={}
+    elseif mode=="reorder" then menu.items[2],menu.items[3]=menu.items[3],menu.items[2]
+    elseif mode=="focus" then pointer("cancelled")
+    elseif mode=="click" then
+      hooks:wrap("input.pointer",function() return true end,100)
+      uiPointer("pressed",100,100)
+    elseif mode=="disabled" then options.wheel_lists=false end
+    tick(5)
+    eq(menu.index,mode=="cursor" and 2 or 1); noHold()
+    if mode=="physical" then game.input:sourceRelease("b","keyboard:b") end
+  end)
+end
+test("unknown or redrawn lists never receive wheel actions",function()
+  local menu=wheelFixture()
+  menu.draw=noop; render()
+  game:wheelmoved(0,-2); tick(4); eq(menu.index,1)
+end)
+local function bufferedMessage(delay)
+  options.dialogue_buffer=true
+  local state=messageFixture(false)
+  state.msgPromptWait=delay or 4; render()
+  assert(clickUI(8,8))
+  return state
+end
+test("early battle click waits for the native prompt and fires once",function()
+  local state=bufferedMessage(4)
+  assert(state.current); tick(5); eq(state.current,nil)
+  tick(3); assert(not game.input:wasPressed("a")); noHold()
+end)
+test("early click lifetime follows real time under fast-forward",function()
+  game.logicSpeed=function() return 4 end
+  local state=bufferedMessage(30)
+  tick(32); eq(state.current,nil)
+end)
+test("buffer expires and repeated clicks do not extend the first click",function()
+  local state=bufferedMessage(30)
+  tick(15); clickUI(8,8)
+  tick(16); assert(state.current); assert(not game.input:wasPressed("a"))
+  drawDock(); assert(hasText("expired"))
+end)
+for _, reason in ipairs({"state","message","line","prompt","physical","focus","right","disabled","save"}) do
+  test("early battle click cannot cross "..reason,function()
+    local state=bufferedMessage(5)
+    if reason=="state" then game.stack:push({menu=true})
+    elseif reason=="message" then state.current={text="different"}
+    elseif reason=="line" then state.lineIndex=1
+    elseif reason=="prompt" then state.msgPrompt=nil; state.msgWaiting=true
+    elseif reason=="physical" then game.input:sourcePress("left","keyboard:left")
+    elseif reason=="focus" then pointer("cancelled")
+    elseif reason=="right" then clickUI(8,8,2)
+    elseif reason=="disabled" then options.dialogue_buffer=false
+    elseif reason=="save" then game.save={} end
+    tick(10)
+    assert(not game.input:wasPressed("a")); noHold()
+    if reason~="right" then assert(state.current) end
+    if reason=="physical" then game.input:sourceRelease("left","keyboard:left") end
+  end)
+end
+test("early dialogue click waits out a native text hold",function()
+  options.dialogue_buffer=true
+  local done=false
+  local box=TextBox.new(game,"HELLO",function() done=true end,{instant=true})
+  box.holdFrames=4
+  uiFrame(box)
+  assert(clickUI(8,8)); assert(not done)
+  tick(5); assert(done); noHold()
+end)
+for _, field in ipairs({"pageIndex","lineIndex","choice"}) do
+  test("early text click cannot cross a changed "..field,function()
+    options.dialogue_buffer=true
+    local box=TextBox.new(game,"HELLO",noop,{instant=true})
+    box.holdFrames=4; uiFrame(box); assert(clickUI(8,8))
+    box[field]=field=="choice" and noop or (box[field] or 1)+1
+    tick(5); assert(not game.input:wasPressed("a")); assert(game.stack:top()~=ow); noHold()
+  end)
+end
+test("early clicks never buffer a pending choice or automatic text",function()
+  options.dialogue_buffer=true
+  local box=TextBox.new(game,"HELLO",noop,{instant=true})
+  box.choice=noop; box.holdFrames=4; uiFrame(box)
+  eq(clickUI(8,8),false); assert(not game.input:wasPressed("a"))
+  box.choice=nil; box.auto={delay=50}; box.holdFrames=4; render()
+  eq(clickUI(8,8),false); assert(not game.input:wasPressed("a"))
+end)
+local function dexFixture()
+  local state=setmetatable({game=game,def={},page=1,pageCount=2,
+    crySrc={isPlaying=function() return true end}},require("src.ui.DexEntryMenu"))
+  uiFrame(state)
+  return state
+end
+test("early Pokedex click waits for cry and advances exactly one native page",function()
+  options.dialogue_buffer=true
+  local state=dexFixture()
+  assert(clickUI(8,8)); eq(state.page,1)
+  state.crySrc=nil; tick(3)
+  eq(state.page,2); eq(game.stack:top(),state); noHold()
+end)
+test("Pokedex buffer cannot confirm a changed page or species",function()
+  options.dialogue_buffer=true
+  local state=dexFixture()
+  assert(clickUI(8,8)); state.page=2; state.def={}; state.crySrc=nil
+  tick(4); eq(game.stack:top(),state); eq(state.page,2); noHold()
+end)
+test("Pokedex default still ignores early clicks instead of retaining them",function()
+  local state=dexFixture()
+  clickUI(8,8); state.crySrc=nil; tick(4); eq(state.page,1)
+end)
+test("dock controls retain their slots when Wilds is enabled",function()
+  drawDock()
+  local before={}
+  for _, t in ipairs(draws.text) do before[t[1]]={t[2],t[3]} end
+  catchingFixture(); drawDock()
+  for _, t in ipairs(draws.text) do
+    if before[t[1]] then eq(t[2],before[t[1]][1]); eq(t[3],before[t[1]][2]) end
+  end
+  clickDock(10); clickDock(10,"released"); tick()
+  eq(game.stack:top(),ow); drawDock(); assert(hasText("Right-click cancels"))
+end)
+test("disabled Wilds slots explain requirements without sending game input",function()
+  drawDock(); clickDock(11); clickDock(11,"released"); tick(2)
+  drawDock(); assert(hasText("requires Wilds")); noHold()
+  eq(game.stack:top(),ow)
+end)
+for _, size in ipairs({"compact","comfortable","large"}) do
+  for _, dimensions in ipairs({{960,720},{320,240},{640,480},{240,160}}) do
+    test("dock "..size.." remains readable and bounded at "..dimensions[1].."x"..dimensions[2],function()
+      options.dock_size=size
+      local w,h=dimensions[1],dimensions[2]
+      local v=hooks:call("render.viewport",function() return {x=17,y=29,width=w,height=h} end,
+        {width=w,height=h})
+      hooks:call("render.window",noop,game,{})
+      assert(v.height>=h*0.55)
+      for _, r in ipairs(draws.rects) do
+        assert(r[2]>=17 and r[3]>=29+v.height and r[4]>0 and r[5]>0)
+        assert(r[2]+r[4]<=17+w and r[3]+r[5]<=29+h)
+      end
+      for _, t in ipairs(draws.text) do
+        local scale=t[5] or 1
+        eq(scale,1,"dock text must not resize an existing font texture")
+        assert(t.font:getHeight()>=16,"dock text must remain readable")
+        assert(t[2]+t.font:getWidth(t[1])<=17+w+0.001)
+        assert(t[3]+t.font:getHeight()<=29+h+0.001)
+      end
+      if w<300 then assert(hasText("Enlarge")) end
+    end)
+  end
+end
+test("small dock pagination exposes all stable controls without gameplay input",function()
+  local function smallDock()
+    hooks:call("render.viewport",function() return {x=0,y=0,width=320,height=240} end,
+      {width=320,height=240})
+    hooks:call("render.window",noop,game,{})
+  end
+  smallDock(); assert(hasText("MORE 1/4"))
+  uiPointer("pressed",40,226,1,true); uiPointer("released",40,226,1,true)
+  tick(); smallDock(); assert(hasText("MORE 2/4")); assert(hasText("SELECT")); noHold()
+end)
+test("dock reports waiting and unsupported-screen contexts",function()
+  ow.player.inputLocked=true; drawDock(); assert(hasText("Waiting"))
+  ow.player.inputLocked=false
+  uiFrame({custom=true}); drawDock(); assert(hasText("No direct-click adapter"))
+end)
+for _, inherited in ipairs({8,12,32,72}) do
+  test("dock font is independent of inherited game font size "..inherited,function()
+    local font=testFont(inherited)
+    currentFont=font
+    drawDock()
+    eq(currentFont,font,"dock must restore the game's font")
+    for _, text in ipairs(draws.text) do
+      eq(text[5],nil,"native-size text must not be scaled")
+      assert(text.font~=font); assert(text.font.size>=16)
+      eq(text[2],math.floor(text[2])); eq(text[3],math.floor(text[3]))
+    end
+    local count=#fontsCreated
+    drawDock(); eq(#fontsCreated,count,"fonts must be cached between frames")
+  end)
+end
+test("dock fonts refresh and align to pixels when display DPI changes",function()
+  drawDock()
+  local old=fontsCreated[1]
+  fontDPI=1.5; draws.text={}
+  drawDock(); assert(old.released)
+  for _, text in ipairs(draws.text) do
+    eq(text.font.dpi,1.5); eq(text.font.hinting,"normal")
+    assert(math.abs(text[2]*1.5-math.floor(text[2]*1.5+0.5))<0.0001)
+    assert(math.abs(text[3]*1.5-math.floor(text[3]*1.5+0.5))<0.0001)
+    eq(text[5],nil)
+  end
+end)
+local function followerFixture(mode, size)
+  local npc, calls=worldFixture(1,0)
+  npc.px, npc.py=npc.cellX*16,npc.cellY*16
+  npc.passable=true
+  npc.sprite={def={pokepcFollowerVisualScale=size or 1}}
+  ow.follower=npc
+  if mode ~= "flat" then
+    projectionFixture(mode)
+    options.projected_anchor=false
+    projectionCase.project=function(x,y)
+      if mode=="voxel" then
+        return 240+(x-ow.player.px-8)*4,300+(y-ow.player.py-16)*4,0.75
+      end
+      return x,y
+    end
+  end
+  render()
+  local x,y
+  if mode=="voxel" then
+    x,y=10+304/2,20+(268-8*4*0.75*(size or 1))/3
+  elseif mode=="tilt" then
+    x=17+(npc.px+8-math.floor(ow.camera.x))*3
+    y=29+(npc.py+12-math.floor(ow.camera.y)-8*(size or 1))*2
+  else
+    x=game.renderer.wipeWox+(npc.px+8-math.floor(ow.camera.x))*game.renderer.wipeSx
+    y=game.renderer.wipeWoy+(npc.py+12-math.floor(ow.camera.y)-8*(size or 1))*game.renderer.wipeSy
+  end
+  return npc,calls,x,y
+end
+for _, mode in ipairs({"flat","tilt","voxel"}) do
+  for _, size in ipairs({0.5,1,2}) do
+    test(mode.." follower sprite click interacts at visual scale "..size,function()
+      local npc,calls,x,y=followerFixture(mode,size)
+      uiPointer("pressed",x,y); uiPointer("released",x,y); tick(5)
+      eq(calls[1],npc); eq(#calls,1); eq(ow.player.facing,"right"); eq(#steps,0); noHold()
+    end)
+  end
+  test(mode.." pointing past a follower steers without talking",function()
+    local _,calls=followerFixture(mode)
+    uiPointer("pressed",850,mode=="flat" and origin.y or 360); tick(24)
+    eq(#calls,0); eq(ow.player.facing,"right"); assert(#steps>0)
+    uiPointer("released",850,360); tick(); noHold()
+  end)
+end
+for _, change in ipairs({"missing","rejected","moved","hidden","camera","level"}) do
+  test("projected follower ignores "..change.." sprite observation",function()
+    local npc,calls,x,y=followerFixture("voxel")
+    if change=="missing" then projectionCase.skipFx=true; render()
+    elseif change=="rejected" then projectionCase.rejected=true; render()
+    elseif change=="moved" then npc.px=npc.px+1
+    elseif change=="hidden" then npc.hidden=true
+    elseif change=="camera" then ow.camera.x=ow.camera.x+1
+    else voxelLevel=voxelLevel+1 end
+    uiPointer("pressed",x,y); uiPointer("released",x,y); tick(5)
+    eq(#calls,0); noHold()
+  end)
+end
+for _, aa in ipairs({2,3}) do
+  test("voxel follower hitbox accounts for antialiasing factor "..aa,function()
+    local npc,calls,x,y=followerFixture("voxel")
+    projectionCase.aa=aa; render()
+    uiPointer("pressed",x,y); uiPointer("released",x,y); tick(5)
+    eq(calls[1],npc); eq(#calls,1); eq(#steps,0); noHold()
+  end)
+end
+test("queued follower click cancels when its sprite moves",function()
+  local npc,calls,x,y=followerFixture("voxel")
+  uiPointer("pressed",x,y); uiPointer("released",x,y)
+  npc.px=npc.px+1; tick(5); eq(#calls,0); noHold()
+end)
+test("native Pikachu follower marker uses sprite bounds without an ow.follower alias",function()
+  local npc,calls,x,y=followerFixture("voxel")
+  ow.follower=nil; npc.pikachuFollower=true
+  local follower=require("src.world.PikachuFollower")
+  local inner=follower.talk
+  follower.talk=function(_,_,target) calls[#calls+1]=target end
+  render(); uiPointer("pressed",x,y); uiPointer("released",x,y); tick(5)
+  follower.talk=inner
+  eq(calls[1],npc); eq(#calls,1); noHold()
+end)
+
+local function zoomedChoice(anchor)
+  local answer
+  local box=ChoiceBox.new(game,function(yes) answer=yes end,
+    {box={tx=0,ty=7,tw=6,th=5},anchor=anchor})
+  uiFrame(box,anchor and {{x=0,y=56,w=48,h=40,anchor=anchor}} or {})
+  frameCase={worldActive=true}
+  game.renderer.frameRects=function(self)
+    local scale=self.worldActive and 4 or 8
+    return {uox=70,uoy=20,Ux=scale/2,Uy=scale/3,uiw=160,uih=144,
+      vux=10,vuy=12,vuw=920,vuh=588,dpiX=2,dpiY=3}
+  end
+  render()
+  return box,function() return answer end
+end
+for _, anchor in ipairs({"center","bottom","topright"}) do
+  test("zoomed save CANCEL click and highlight use the displayed "..anchor.." transform",function()
+    local box,answer=zoomedChoice(anchor~="center" and anchor or nil)
+    eq(game.renderer.worldActive,false)
+    local x=(anchor=="topright" and 930-160*2 or 70)+24*2
+    local y=(anchor=="bottom" and 600-144*4/3 or anchor=="topright" and 12 or 20)+82*4/3
+    uiPointer("moved",x,y); render()
+    local found=false
+    for _, r in ipairs(draws.rects) do
+      if r[1]=="line" and x>=r[2] and x<r[2]+r[4] and y>=r[3] and y<r[3]+r[5] then
+        eq(r[4],32*2-2); assert(math.abs(r[5]-(8*4/3-2))<0.0001); found=true
+      end
+    end
+    assert(found,"highlight must cover the drawn CANCEL row")
+    uiPointer("pressed",x,y); uiPointer("released",x,y); tick(30)
+    eq(answer(),false); noHold()
+  end)
+end
+test("zoomed save click at the old post-endFrame position does not answer",function()
+  local _,answer=zoomedChoice()
+  uiPointer("pressed",70+24*4,20+82*8/3)
+  uiPointer("released",70+24*4,20+82*8/3); tick(30)
+  eq(answer(),nil); noHold()
+end)
+test("UI capture follows zoom changes on the next rendered frame",function()
+  local _,answer=zoomedChoice()
+  frameCase.worldActive=false; render()
+  uiPointer("pressed",70+24*4,20+82*8/3)
+  uiPointer("released",70+24*4,20+82*8/3); tick(30)
+  eq(answer(),false); noHold()
+end)
+test("classic choice over a wide battle follows the native horizontal offset",function()
+  local answer
+  local box=ChoiceBox.new(game,function(yes) answer=yes end)
+  local battle={uiSize=function() return 304,144 end}
+  game.wideBattleInStack=function() return battle end
+  uiFrame(box)
+  game.renderer.frameRects=function()
+    return {uox=20,uoy=10,Ux=2,Uy=2,uiw=304,uih=144,
+      vux=0,vuy=0,vuw=960,vuh=620,dpiX=1,dpiY=1}
+  end
+  render()
+  uiPointer("pressed",20+(132+72)*2,10+82*2)
+  uiPointer("released",20+(132+72)*2,10+82*2); tick(30)
+  eq(answer,false); noHold()
+end)
+
+assert(load(SCREEN_TESTS_SOURCE))()({
+  test=test, eq=eq, clickUI=clickUI, uiPointer=uiPointer,
+  uiFrame=uiFrame, tick=tick, render=render, noHold=noHold,
+  getGame=function() return game end,
+  getRegistry=function() return registry end,
+  getOptions=function() return options end,
+})
+
 print(string.format("%d tests passed", count))

@@ -82,9 +82,11 @@ return function(game)
   end
   local function dock(index)
     local w, h = love.graphics.getDimensions()
-    local height = math.min(100, math.floor(h*0.24))
-    local cellW, cellH = w/5, (height-22)/2
-    click(((index-1)%5+0.5)*cellW, h-height+math.floor((index-1)/5)*cellH+cellH/2)
+    local cols, cellH = math.max(2, math.min(6, math.floor(w/100))), 32
+    local rows = math.max(1, math.min(math.ceil(12/cols), math.floor((h*0.45-48)/cellH)))
+    assert(index <= rows*cols and w >= 300 and h >= 240, "Dock control not on first page")
+    local height, cellW = rows*cellH+48, w/cols
+    click(((index-1)%cols+0.5)*cellW, h-height+math.floor((index-1)/cols)*cellH+cellH/2)
   end
   local function menu(label)
     local s = top()

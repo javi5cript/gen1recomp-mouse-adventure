@@ -77,7 +77,7 @@ screenshots, other mods and game data are excluded.
 
 ## Regression and play coverage
 
-`tests\run.js` and `tests\controls.lua` are the existing development harness,
+`tests\run.js`, `tests\controls.lua` and `tests\screens.lua` form the development harness,
 now tracked in this repository. Dependencies are locked in `package-lock.json`.
 The runner loads native Input, Player, Collision, Camera, menu, intro and title
 modules from the installed engine. It extracts the native overworld dispatch
@@ -94,6 +94,56 @@ Include Red, Blue and Yellow; intro/title/Continue; NPCs, signs, item balls,
 counters and scenery; dialogue and Oak's Yellow catching demonstration;
 menu/battle/naming controls; held movement across doors and map connections.
 Preserve saves and do not replace the user's mod settings automatically.
+
+### v1.4.0 QoL coverage
+
+Wheel navigation defaults to ON; early-click, click-versus-hold,
+projected-anchor and four-way options default to OFF. Keep both the default
+path and each enabled/disabled path in
+the controls regressions. The harness uses native Pokedex entry update/cry
+methods and PartyMenu input with BattleState's voluntary-switch callback in
+addition to the existing menu, text and battle dispatch. Cover SWITCH, STATS
+and CANCEL in native, Modern Party and recognized Gen1Party geometry,
+active/fainted refusals, forced replacement and stale-click cancellation.
+Replacement layout fixtures model the inspected mod geometry; they do not
+load or prove the third-party renderer.
+
+`tests\screens.lua` exercises native summary/trainer/map controllers and the
+Pokedex's private action menu. When the recognized replacement mods are
+installed, the runner extracts their input methods read-only for additional
+Modern Party, Modern Pokedex and Gen1Dex cases. Missing optional mods skip
+those cases; changed extraction contracts fail explicitly. Horizontal wheel
+descriptors must be honored by the input transport, including fractional
+notches, native page resets and cancellation before scrolling a different tab.
+
+Dock labels must use dedicated fonts at native size, not a scaled copy of the
+font left active by the game or another mod. Cover font inheritance, cache
+reuse, DPI changes and pixel alignment alongside each dock size.
+
+Projection tests supply explicit camera coordinates, canvas/DPI geometry and
+rejected/missing-frame cases. They must model `Renderer:endFrame` clearing its
+world override and `worldActive` flag before `render.hud`. UI target projection
+must use the endFrame snapshot, including anchors and classic overlays inside
+wide battles, rather than recomputing the now-different UI scale. Cover save
+choices at centered/bottom/top-right layouts and unequal DPI scales.
+
+Follower picking is separate from the optional steering anchor: projected
+sprite bounds are collected even when centered steering is selected. Cover
+native Pikachu and follower aliases, scaled sprites, near versus past clicks,
+and missing/rejected/stale camera observations. These fixtures verify the adapter's math
+and ownership, not the real GPU pipeline.
+
+Before release, exercise flat/tilt/voxel map edges and camera transitions,
+short click versus long hold near NPCs and counters, wheel navigation with
+other mouse mods, early clicks during sounds and page changes, and all dock
+sizes at narrow/high-DPI resolutions. Ensure a keyboard/controller press,
+focus loss, changed list, changed page or changed target cancels queued intent.
+Do not enable the opt-ins in the baseline opening profile implicitly.
+
+The guide hotkey's session override must work without `mod.options:set`,
+which the baseline engine does not expose. Keep failure-path cases for
+engines that do expose setters/persistence; do not silently swallow failures.
+Native control key bindings must keep precedence over the guide key.
 
 ## Automated opening playthrough
 

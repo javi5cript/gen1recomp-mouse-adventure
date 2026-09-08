@@ -1,61 +1,40 @@
-# Mouse Adventure 1.3.0
+# Mouse Adventure
 
 **Hold to move. Point to steer. Click to interact.**
 
-Mouse-first, single-player Pokemon for Gen1Recomp Red, Blue and Yellow.
-This builds on the working eight-direction steering without changing the
-original turn-based battles, progression, collision, or save rules.
+Play Pokemon Red, Blue and Yellow with mouse-first controls for
+[Gen1Recomp](https://github.com/bryanthaboi/gen1recomp). Explore with held
+steering, click nearby characters and objects, and navigate dialogue, menus
+and battles with the mouse. Battles, progression, collision and saving keep
+their normal game rules.
 
 Maintained by [javi5cript](https://github.com/javi5cript).
-Mod code is licensed under [MIT](LICENSE), with upstream acknowledgments and notices in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Mouse Adventure at a glance
-
-**Point-to-steer, not click-to-destination.** Hold the left mouse button and
-point in a direction relative to your character. Move the cursor while holding
-to steer up, down, left, right, or into one of four diagonal sectors. You keep
-moving beyond the original cursor location as long as it remains ahead of you.
-A live line and arrow show your steering direction. Release to stop issuing
-movement; the current tile step finishes normally.
 
 ![Mouse Adventure's live overworld steering arrow while holding left-click, with the action dock below](docs/screenshots/held-steering.png)
 
-*Mouse Adventure's live direction guide and action dock. Captured in a modded
-game; additional world content is not included with Mouse Adventure.*
+*v1.3.0 direction guide and action dock; v1.4.0 has a revised dock layout.
+Captured in a modded game; additional world content is not included with Mouse Adventure.*
 
-Click to advance dialogue or confirm supported menu and battle choices.
-Click an adjacent NPC, item ball, sign, or solid object to face and interact
-with it. Clerks and nurses can also be clicked across a single counter.
-Right-click to go back. The action dock provides clickable Game Boy controls
-below the play area, so you can interact, open menus, and navigate without
-reaching for the keyboard.
+## Installation
 
-**Works with tilt and the voxel orbit.** Held steering and click-to-interact
-now run in the flat 2D overworld, the engine's TILT view, and the voxel mod's
-orbit/diorama levels (1-5). These cameras only pitch down from the south with
-no yaw, so world east/west stays screen left/right and north/south stays
-up/down; steering points relative to the centre of the view. The free-look
-voxel cameras (first-person level 6 and third-person level 7) have no fixed
-mapping and are not supported -- the mod steps aside and logs a warning there
-rather than moving you the wrong way.
-
-## Status and installation
-
-Mouse Adventure **v1.3.0 (public beta)** is published. Download
-`click_to_move-1.3.0.zip` from the
+Download Mouse Adventure **v1.4.0 (public beta)**:
+`click_to_move-1.4.0.zip` from the
 [releases page](https://github.com/javi5cript/gen1recomp-mouse-adventure/releases).
-Broader clean-game compatibility testing is ongoing; do not assume every
-replacement UI is directly clickable, and please report any screen that does not
-take clicks.
 
-Requires [Gen1Recomp](https://github.com/bryanthaboi/gen1recomp) and your own
-legally obtained game data. This is not a standalone game.
+Requires **Gen1Recomp 0.2.56 or later in the pre-2.0 series** and your own
+legally obtained Red, Blue or Yellow game data. This is a single-player mod,
+not a standalone game.
 
-**Install (recommended):** in the launcher, open **MODS -> Import mod .zip**,
-select `click_to_move-1.3.0.zip`, enable **Mouse Adventure**, and start Red,
-Blue, or Yellow. Held steering runs in the flat, TILT, and voxel-orbit
-overworlds; only the free-look voxel cameras (levels 6 and 7) are unsupported.
+> Public beta: clean-game coverage across Red, Blue and Yellow is not yet
+> complete. Experimental controls are opt-in; replacement UI compatibility
+> depends on the installed layout.
+
+1. Save your progress and close the game.
+2. In the launcher, open **MODS -> Import mod .zip** and select
+   `click_to_move-1.4.0.zip`.
+3. Enable **Mouse Adventure** for Red, Blue or Yellow, then start the game.
+
+Download the release asset, not GitHub's automatic **Source code (zip)**.
 
 **Manual install (alternative):**
 
@@ -65,89 +44,88 @@ overworlds; only the free-look voxel cameras (levels 6 and 7) are unsupported.
 3. Copy `manifest.json`, `main.lua`, `mouse_ui.lua`, `mouse_targets.lua`,
    `README.md`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` into that folder.
 4. Start Red, Blue, or Yellow and enable **Mouse Adventure** in the mod manager.
-   Held steering runs in the flat, TILT, and voxel-orbit overworlds.
 
 To uninstall, close the game and remove only `mods\click_to_move`, or disable
 Mouse Adventure in the mod manager. Leave saves, carts, and other mods alone.
-Existing installations retain the `click_to_move` ID and option keys.
-
-The release asset `click_to_move-1.3.0.zip` is already packaged this way, with
-the seven files at the archive root. GitHub's automatic *source* ZIP is
-different: it wraps everything in a repository folder and is not an installable
-mod release. If you build your own archive, package the seven files directly at
-the ZIP root and do not include `.git`, ROMs, saves, engine files, or other mods.
-
-## Development workflow
-
-Edit and commit this repository, never the installed mod copy. This is a Lua
-mod: "build" means validate and package, not recompile or patch `gen1recomp.exe`.
-The engine loads the installed Lua files when the game starts.
-
-See [Development setup](docs/DEVELOPMENT.md) for prerequisites, local paths,
-commit/install order, backups, and testing boundaries.
-
-```powershell
-npm ci
-# Once: copy .dev.example.json to .dev.local.json and set GameDirectory.
-.\scripts\dev.ps1 -Task Test
-# Review and commit the changes before deploying them.
-.\scripts\dev.ps1 -Task Install
-# Or install and open Yellow; save and close any running game first.
-.\scripts\dev.ps1 -Task Run -Game yellow
-```
-
-Build, Install and Run all run the regression suite first. Install deploys the
-built ZIP only to `mods\click_to_move`, backs up the previous copy, and refuses
-to proceed while Gen1Recomp is running. Saves, game options, other mods and
-the engine executable are not changed. Nothing is automatically pushed,
-tagged or published by the development script.
-
-### Why Mouse Adventure?
-
-**Mouse Adventure** remains the name because this is a mouse-first control
-experience, not only a movement mod: steering, nearby interactions, dialogue,
-menus, battles and the controller dock all belong together. The descriptive
-tagline is **"Hold to move. Point to steer. Click to interact."** The repository
-name and `click_to_move` mod ID remain unchanged for compatibility; that ID
-does not imply destination-based pathfinding.
 
 ## Mouse controls
 
-- Click the intro or title screen to send A; mandatory startup animations
-  keep their normal timing. Click a main-menu row, then the Continue info
-  box to load an existing save.
-- Hold the left mouse button to move toward the cursor, relative to the player.
-- Drag while holding to steer up, down, left, right or along the four diagonals.
-- Release to stop issuing movement. The current tile step finishes normally.
-- Move the cursor onto the player to pause in the dead zone without releasing.
-- Click a nearby NPC, item ball, sign, or solid scenery to face it and
-  interact once. Stand on a completed tile, directly beside the target
-  (not diagonally); a single counter can separate you from an NPC.
-- Click anywhere in the game view to advance a waiting dialogue prompt,
-  including battle messages and Oak's Yellow catching demonstration.
-  Scripted waits, animations, sounds, and automatic demonstration choices still apply.
-- Click a supported menu row or battle choice to select and confirm it.
-- Hover a supported choice to see a cyan outline of its clickable area.
-- Right-click to send B in menus, including backing out of move selection.
-- Right-click during steering cancels movement instead of also interacting.
-- Press G in the overworld to hide or show the steering line and arrow. The
-  saved STEERING GUIDE option sets the startup state; the hotkey flips it on
-  the fly and never fires while naming or in a menu.
-- Keyboard/controller input takes priority over pending mouse actions.
-- A touch held outside the engine's virtual controls works the same way.
+| Input | Action |
+| --- | --- |
+| Hold left mouse button | Move in the direction of the cursor |
+| Move the cursor while holding | Steer in eight directions |
+| Release | Stop after the current tile step |
+| Point at the player while holding | Pause inside the dead zone |
+| Click a nearby character or object | Face it and interact once |
+| Click a menu row or battle choice | Select and confirm |
+| Click during a waiting dialogue prompt | Advance text |
+| Hover a supported choice | Highlight its clickable area |
+| Mouse wheel | Scroll a supported list or change supported Pokedex tabs without confirming |
+| Right-click | Go back in menus, or cancel held steering |
+| G in the overworld | Hide or show the steering guide |
 
-There is no destination tile or route queue: keep holding to keep moving.
-Nearby object clicks use native D-pad turning followed by A, preserving
-dialogue, item capacity checks, scripts and save rules. Empty ground, water,
-and distant targets keep held steering; there is no automatic approach or
-repeated interaction while held. Clicking solid scenery attempts the normal
-interaction even when the tile has nothing to say. For other interactions
-and field actions, face the target and use INTERACT / A or the party menu.
+**Hold to move, point to steer** -- not click-to-destination. Keep holding to
+keep moving; the mod does not find a route or approach distant targets for you.
+Diagonal movement alternates horizontal and vertical tile steps.
 
-## Action dock: mouse-only fallback
+Stand still directly beside an NPC, item ball, sign or solid object before
+clicking it. Clerks and nurses can also be reached across a single counter.
+For other field actions, face the target and use **INTERACT / A** or the party menu.
+
+Click directly on your following Pokemon to talk.
+Pointing past it starts normal held steering instead, including in tilt and
+voxel orbit. The game's collision rules still apply.
+
+Click the intro/title to continue when ready. To load a save, click the
+main-menu row and then the Continue information box. Dialogue, battle messages,
+level-up stats and post-catch Pokedex pages accept clicks when ready;
+animations, sounds and scripted waits still apply.
+
+The guide toggle lasts for the current session. Use **STEERING GUIDE** in the
+mod settings to choose its startup state. You can also
+choose H or J and click **GUIDE** in the dock footer. The key only works in the
+overworld and yields to custom Game Boy key bindings.
+
+Keyboard/controller input takes priority. Touch steering also works outside
+the engine's virtual controls. Opening a menu or entering battle ends a hold;
+press again afterward. Door transitions and scripts pause movement. Release
+or lose window focus to cancel it.
+
+### Optional precision and input controls
+
+**TILT/VOXEL CLICK VS HOLD** separates directional interaction from steering.
+Near an adjacent target, make a short click to interact, or keep holding
+(about 0.18 seconds) or drag to start moving instead. Flat-view controls are
+unchanged.
+
+**WHEEL NAVIGATION** is on by default and moves the selection through supported
+menu, bag and Pokedex lists while the cursor is inside the game view. Enable
+it in mod settings if you previously switched it off. Scrolling never
+confirms or activates an item. Overworld wheel zoom is unchanged. Battle
+choices, naming, PC and party screens still use clicks or dock arrows.
+On supported Modern Pokedex and Gen1Dex entries, the wheel scrolls notes or
+moves when available; otherwise it changes entry tabs.
+
+**EARLY DIALOGUE CLICK** retains one click for up to 0.35 seconds while a
+visible dialogue/battle prompt or post-catch Pokedex cry finishes waiting.
+It does not skip typing, attack animations or confirmation choices. A buffered
+click expires rather than carrying into another page or screen; the dock
+shows its status.
+
+**FOUR-DIRECTION STEERING** chooses only the dominant cardinal direction.
+**DEAD ZONE / DIRECTION** displays the pause radius and current direction while
+holding; **HIGH-CONTRAST GUIDE** and **GUIDE THICKNESS** improve line visibility.
+
+## Action dock
 
 A separate strip below the game contains every Game Boy button. It reserves
 window space rather than covering dialogue, menus, or the battle HUD.
+The dock offers COMPACT, COMFORTABLE and LARGE sizes, stable button
+positions, and MORE pages for small windows. Its footer shows control hints,
+waiting messages and clickable guide status.
+Text uses dedicated, DPI-aware fonts: 16-pixel compact labels, 18-pixel
+comfortable labels, 20-pixel large labels and a 16-pixel footer. It is not
+shrunk from the game's font.
 
 | Control | Purpose |
 | --- | --- |
@@ -158,101 +136,58 @@ window space rather than covering dialogue, menus, or the battle HUD.
 | UP / DOWN / LEFT / RIGHT | Hold to navigate or walk/face using native D-pad input |
 | MODS | Open or close the engine's mod manager (the normal F10 action) |
 | HELP | Show a short control reference in the dock |
+| GUIDE ON/OFF | Toggle the steering guide without issuing game input |
+| MORE | Show the next dock page when the window cannot fit every control |
 
 On the native naming grid the controls read TYPE, DELETE, DONE and CASE.
 Click letters directly, or use the arrows and TYPE. Preset names remain native
-menu choices. No operating-system text entry is injected.
+menu choices.
 
-When a replacement menu has no reliable direct-click adapter, use the dock's
-arrows and CONFIRM instead. This still avoids keyboard use without pretending
-that every custom menu has a supported visual hitbox.
+If a screen does not respond to direct clicks, use the dock's arrows and
+**CONFIRM / A**. To save, choose **MENU -> SAVE** and answer the game's
+confirmation.
 
 ### Overworld Pokemon
 
-When Wilds of Kanto's overworld catching is enabled, two more controls appear:
+With Wilds of Kanto's overworld catching enabled:
 
-- HOLD: THROW holds the configured Wilds modifier/action combo; release inside
-  the dock to let Wilds finish its normal throw.
-- NEXT BALL calls Wilds' own selected-ball cycling action.
+- **HOLD: THROW** charges a throw; release inside the dock to throw.
+- **NEXT BALL** cycles the selected ball.
 
-Stop walking before charging. Right-click, focus loss, leaving the dock, or a
-state change cancels the charge rather than accidentally throwing. The mod
-respects whether Wilds uses B+A or Select+A; a disabled combo is explained in
-the dock. Wild spawn rates, encounters, inventory and catch calculations are
-not changed.
+Stop walking before charging. Right-click, focus loss, leaving the dock, or
+opening another screen cancels the charge. Enable a throw-button combo in
+Wilds' settings if the dock asks for one. The dock keeps these
+buttons in place but disabled when catching is unavailable.
 
-## Quality-of-life analysis and design boundaries
-
-The engine and the installed modern UI mods do not share a universal mouse
-selection API. A replacement battle panel, a classic bag, and a native dialogue
-box have different layouts and input rules. Reliable mouse support therefore
-needs two layers: precise adapters for recognized layouts and a complete visible
-controller fallback for everything else.
+## Supported screens
 
 | Screen | Direct-click coverage |
 | --- | --- |
 | Overworld | Adjacent NPCs, item balls, signs and solid scenery; NPCs across one counter |
-| Startup | Intro/title native A input, main-menu rows and Continue info box |
+| Startup | Intro/title screens, main-menu rows and Continue info box |
 | Native menus and confirmations | Visible rows, YES/NO, scrolled lists |
-| Dialogue | Ready text pages; scripted delays remain native |
-| Native battles | Command and move choices, Safari and Mimic, classic and wide layouts |
-| Party | Native rows and recognized Modern Party cards/submenus |
+| Dialogue | Ready text pages, including battle messages |
+| Native battles | Command and move choices, Safari and Mimic, level-up stats, classic and wide layouts |
+| Party | Native rows and recognized Modern Party cards/submenus; native and Gen1Party SWITCH / STATS / CANCEL popups |
+| Pokemon stats | Click native summary pages to advance/return; recognized Modern Party summaries also support move cards and details |
 | PC | Recognized Modern PC slots, actions and box picker |
-| Pokedex | Native rows and recognized Modern Pokedex rows/actions/filters |
+| Pokedex | Native and recognized Modern Pokedex lists; post-catch data pages; DATA / CRY / AREA menus and recognized Gen1Dex lists/entries |
+| Area map | Native map dismissal; recognized Gen1Dex hints/location controls and right-click to return |
+| Trainer/badges | Click to close the native trainer card; badges remain display-only |
 | Naming | Native letter grid and recognized modern naming controls |
 | Bag | Native list rows and recognized Modern Bag rows |
-| Other replacement screens | Existing mouse handlers first, then explicit dock controls |
+| Other replacement screens | Use their own mouse controls or the dock |
 
-Gen1BattleUI replacement grids are adapted only without Kanto Gear loaded.
-With Kanto Gear, its existing companion controls retain ownership; the dock
-remains available rather than placing guessed targets over a hidden battle UI.
+Direct clicks on Gen1BattleUI grids work only without Kanto Gear loaded.
+With Kanto Gear, use its companion controls or the dock.
 Operating-system file dialogs and arbitrary mod text/search fields are not
 guaranteed to be keyboard-free.
-
-UI clicks use the renderer's actual UI scale and positioned anchors, not the
-overworld camera transform. That matters for zoom, wide battles, high-DPI
-windows and edge-anchored dialogue. Existing higher-priority mod pointer
-handlers retain first refusal inside the game. The dock's viewport reservation
-is applied before Kanto Gear calculates its companion-panel layout.
-
-Each click belongs to one state, mode and battle phase. Selection is queued for
-a logic tick, changes only the UI cursor, and sends a normal A press. It does not
-call a battle decision, purchase, release, save or item-use callback directly.
-A stale click cannot confirm a newly opened screen. Direct NPC clicks start
-only while standing still; the dock's A action can wait for a tile step to
-finish. Unknown menus are not treated as a blind A-click.
-
-Saving remains MENU -> SAVE -> the game's confirmation. Likewise, a
-noncancelable choice remains noncancelable; right-click is B, not a forced
-stack pop. Scripted battles and the old-man catching demonstration retain
-their native control. These are intentional safeguards, not missing shortcuts.
-
-This is a Diablo-like control scheme, not real-time combat or freeform 3D
-movement. Multiplayer development is out of scope. Existing MMO installations
-are not removed or configured, and this mod never connects to a server.
-
-## Map sections and obstacles
-
-The mod sends normal, source-owned D-pad input; it never writes player position,
-facing, collision data, save data or network state. Holding through a connected
-map edge continues into the next section. Door fades temporarily release input
-and resume steering after arrival if the same pointer is still held.
-
-The engine remains responsible for collisions, ledges, surfing, encounters
-and scripts. It cannot walk through blocked exits.
-Diagonal steering alternates horizontal and vertical tile steps, not freeform
-diagonal physics or diagonal sprites. If one axis is blocked, the other is
-retried after 12 logic ticks. Speed remains the engine's normal step speed.
-
-Menus and battles cancel the gesture and require a new press afterward.
-Scripts and input locks pause steering. Mouse release still cancels during a
-fade or script. Focus loss/input recovery cancels through the engine's pointer
-API. Moving outside the game window releases movement until the pointer comes
-back; losing focus cancels it entirely.
 
 ## Options
 
 Open this mod's settings in the mod manager.
+Wheel navigation defaults to ON; the optional steering and
+early-click behaviors default to OFF.
 
 | Option | Default | Purpose |
 | --- | --- | --- |
@@ -261,54 +196,70 @@ Open this mod's settings in the mod manager.
 | DEAD ZONE | 6 | Pause radius around the player, in world pixels (2-16) |
 | MOUSE MENUS AND DIALOGUE | ON | Enables UI clicks, contextual B and the dock |
 | MOUSE ACTION BAR | ON | Reserves space for visible controller and Wilds controls |
-| GUIDE HOTKEY (G) | ON | Lets the G key hide or show the steering guide in the overworld |
+| GUIDE HOTKEY | ON | Enables the configured guide key in the overworld |
+| GUIDE KEY | G | Choose G, H or J; native Game Boy bindings retain priority |
+| DOCK SIZE | COMPACT | Compact, comfortable or large buttons and text |
+| WHEEL NAVIGATION | ON | Scroll through supported lists without confirming |
+| EARLY DIALOGUE CLICK | OFF | Remember one early click briefly while a visible prompt waits |
+| TILT/VOXEL CLICK VS HOLD | OFF | Release to interact; hold or drag to steer |
+| PROJECTED PLAYER ANCHOR | OFF | Steer relative to the rendered player in tilt/voxel views (experimental) |
+| FOUR-DIRECTION STEERING | OFF | Dominant cardinal direction instead of alternating diagonals |
+| DEAD ZONE / DIRECTION | OFF | Show pause radius and current direction during a hold |
+| HIGH-CONTRAST GUIDE | OFF | Add a black outline beneath the steering arrow |
+| GUIDE THICKNESS | 1 | Steering line width, 1-4 window units |
 
-## Compatibility
-
-Requires Gen1Recomp 0.2.56 or later in the pre-2.0 series.
+## Camera support and limitations
 
 Held steering and click-to-interact work in three overworld cameras:
 
-- the flat 2D blit (default),
+- the flat 2D view (default),
 - the engine's **TILT** view, and
 - the **voxel** mod's orbit/diorama levels 1-5.
 
-All three pitch down from the south without yaw, so the mod steers relative to
-the centre of the view. Standard zoom and high-DPI rendering use the engine's
-actual world-blit coordinates rather than the UI rectangle.
+In tilt and voxel orbit, steer relative to the centre of the view by default.
+The optional PROJECTED PLAYER ANCHOR follows the rendered player instead,
+which can help near map edges.
 
 Known limitations:
 
-- **Free-look voxel cameras are unsupported.** Voxel first-person (level 6) and
-  third-person free-cam (level 7) rotate the yaw freely, so screen directions no
-  longer map to fixed world directions. In these modes the mod stops steering
-  and logs a warning instead of moving you the wrong way; use the voxel mod's
-  own look/move controls there.
+- **Free-look voxel cameras are unsupported.** Use the voxel mod's own
+  controls in first-person (level 6) and third-person free-cam (level 7).
 - **Tilt and voxel-orbit interaction is directional.** Clicking an adjacent NPC,
   sign, or object resolves the click to one of the four cardinal neighbours and
-  faces that way. Pixel-accurate targeting of a specific on-screen sprite is
-  only used in the flat overworld.
-- **Steering anchors on the view centre** under tilt and voxel-orbit, which
-  assumes the player is roughly centred. Accuracy can degrade at map edges where
-  the camera stops following.
+  faces that way. Following Pokemon are an exception:
+  only a sprite-sized area triggers interaction. If its projected position is
+  unavailable, use **INTERACT / A** rather than clicking the surrounding world.
+- **Projected anchoring is optional and experimental.** If the player's screen
+  position is unavailable, steering falls back to the centre and the dock
+  identifies it as approximate. Camera and visual-effect mods may affect accuracy.
 - **Replacement UIs are not guaranteed clickable.** Third-party battle and menu
   UIs that redraw their own screens may not expose click targets.
+- **Gen1Arena backdrops can cover voxel battles.** If an illustrated 2D scene
+  overlaps the voxel view, turn off **Gen1Arena -> BACKDROPS**. If it persists,
+  disable Gen1Arena, save and restart. Mouse Adventure does not resolve
+  conflicts between battle renderers.
 
-The folder/id remains `click_to_move`, preserving existing enablement and
-steering settings. Install all three Lua files (`main.lua`, `mouse_ui.lua`,
-`mouse_targets.lua`) with the manifest, then restart the game. New options
-default to ON. This does not modify the engine executable or other mods.
+## Help and feedback
 
-## Credits and scope
+Report problems on the [issue tracker](https://github.com/javi5cript/gen1recomp-mouse-adventure/issues).
+Include your game, Gen1Recomp and Mouse Adventure versions, active mods,
+camera mode, and steps to reproduce. A screenshot helps with click-target
+or layout problems.
 
-Built for Gen1Recomp by bryanthaboi and contributors. Compatibility work
+For release changes, see the [changelog](CHANGELOG.md).
+For building or contributing, see the [development guide](docs/DEVELOPMENT.md).
+
+## Credits and license
+
+Gen1Recomp is developed by bryanthaboi and contributors. Compatibility work
 references the modern UI projects maintained by piftee, Gen1WildUI and
 Gen1BattleUI by wild1walker, Wilds of Kanto by YoDrehDenSwagAuf, and Kanto Gear
 by AverageConsumer. These are separate projects with their own licenses;
 they are not bundled or required for the basic mouse controls.
 
-This repository contains mod code and documentation only, not ROM data,
-extracted game assets, engine source, or third-party mod distributions.
+Mod code is licensed under [MIT](LICENSE). See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for acknowledgments and notices.
+No ROMs, game assets or third-party mods are included.
 Pokemon and related names belong to their respective owners. This is an
 unofficial fan project, not affiliated with Nintendo, Creatures, or Game Freak.
-The MIT license grants no rights to their games, artwork, or trademarks.
+The MIT license grants no rights to their games, artwork or trademarks.
