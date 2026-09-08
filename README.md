@@ -1,5 +1,7 @@
 # Mouse Adventure 1.2.0
 
+**Hold to move. Point to steer. Click to interact.**
+
 Mouse-first, single-player Pokemon for Gen1Recomp Red, Blue and Yellow.
 This builds on the working eight-direction steering without changing the
 original turn-based battles, progression, collision, or save rules.
@@ -10,9 +12,12 @@ Mod code is licensed under [MIT](LICENSE), with upstream acknowledgments and not
 
 ## Mouse Adventure at a glance
 
-**Hold left-click and drag to steer in eight directions.** A live line and
-arrow show your steering direction. Release to stop issuing movement; the
-current tile step finishes normally.
+**Point-to-steer, not click-to-destination.** Hold the left mouse button and
+point in a direction relative to your character. Move the cursor while holding
+to steer up, down, left, right, or into one of four diagonal sectors. You keep
+moving beyond the original cursor location as long as it remains ahead of you.
+A live line and arrow show your steering direction. Release to stop issuing
+movement; the current tile step finishes normally.
 
 ![Mouse Adventure's live overworld steering arrow while holding left-click, with the action dock below](docs/screenshots/held-steering.png)
 
@@ -28,8 +33,9 @@ reaching for the keyboard.
 
 ## Status and installation
 
-This repository contains the 1.2.0 source snapshot. A packaged public release
-has not been published yet. Broader compatibility testing is still needed;
+This repository contains the development source (manifest version 1.2.0).
+The local build workflow produces an installable ZIP, but a packaged public
+release has not been published yet. Broader compatibility testing is still needed;
 do not assume every replacement UI is directly clickable.
 
 Requires [Gen1Recomp](https://github.com/bryanthaboi/gen1recomp) and your own
@@ -51,6 +57,40 @@ GitHub's automatic source ZIP contains a repository wrapper folder. For an
 installable mod archive, package the seven files above directly at the ZIP
 root and name it `click_to_move-1.2.0.zip`; do not include `.git`, ROMs, saves,
 engine files, or other mods. The source ZIP is not a prepared mod release.
+
+## Development workflow
+
+Edit and commit this repository, never the installed mod copy. This is a Lua
+mod: "build" means validate and package, not recompile or patch `gen1recomp.exe`.
+The engine loads the installed Lua files when the game starts.
+
+See [Development setup](docs/DEVELOPMENT.md) for prerequisites, local paths,
+commit/install order, backups, and testing boundaries.
+
+```powershell
+npm ci
+# Once: copy .dev.example.json to .dev.local.json and set GameDirectory.
+.\scripts\dev.ps1 -Task Test
+# Review and commit the changes before deploying them.
+.\scripts\dev.ps1 -Task Install
+# Or install and open Yellow; save and close any running game first.
+.\scripts\dev.ps1 -Task Run -Game yellow
+```
+
+Build, Install and Run all run the regression suite first. Install deploys the
+built ZIP only to `mods\click_to_move`, backs up the previous copy, and refuses
+to proceed while Gen1Recomp is running. Saves, game options, other mods and
+the engine executable are not changed. Nothing is automatically pushed,
+tagged or published by the development script.
+
+### Why Mouse Adventure?
+
+**Mouse Adventure** remains the name because this is a mouse-first control
+experience, not only a movement mod: steering, nearby interactions, dialogue,
+menus, battles and the controller dock all belong together. The descriptive
+tagline is **"Hold to move. Point to steer. Click to interact."** The repository
+name and `click_to_move` mod ID remain unchanged for compatibility; that ID
+does not imply destination-based pathfinding.
 
 ## Mouse controls
 
@@ -129,6 +169,8 @@ controller fallback for everything else.
 
 | Screen | Direct-click coverage |
 | --- | --- |
+| Overworld | Adjacent NPCs, item balls, signs and solid scenery; NPCs across one counter |
+| Startup | Intro/title native A input, main-menu rows and Continue info box |
 | Native menus and confirmations | Visible rows, YES/NO, scrolled lists |
 | Dialogue | Ready text pages; scripted delays remain native |
 | Native battles | Command and move choices, Safari and Mimic, classic and wide layouts |
@@ -154,8 +196,9 @@ is applied before Kanto Gear calculates its companion-panel layout.
 Each click belongs to one state, mode and battle phase. Selection is queued for
 a logic tick, changes only the UI cursor, and sends a normal A press. It does not
 call a battle decision, purchase, release, save or item-use callback directly.
-A stale click cannot confirm a newly opened screen. NPC actions wait for the
-current tile step to finish. Unknown menus are not treated as a blind A-click.
+A stale click cannot confirm a newly opened screen. Direct NPC clicks start
+only while standing still; the dock's A action can wait for a tile step to
+finish. Unknown menus are not treated as a blind A-click.
 
 Saving remains MENU -> SAVE -> the game's confirmation. Likewise, a
 noncancelable choice remains noncancelable; right-click is B, not a forced

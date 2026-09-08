@@ -1,0 +1,13 @@
+{
+  "name": "gen1recomp-mouse-adventure",
+  "private": true,
+  "license": "MIT",
+  "description": "Development harness for Mouse Adventure; not an npm distribution.",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "luaparse": "0.3.1",
+    "wasmoon": "1.16.0"
+  }
+}
