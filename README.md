@@ -14,6 +14,11 @@ Mod code is licensed under [MIT](LICENSE), with upstream acknowledgments and not
 arrow show your steering direction. Release to stop issuing movement; the
 current tile step finishes normally.
 
+![Mouse Adventure's live overworld steering arrow while holding left-click, with the action dock below](docs/screenshots/held-steering.png)
+
+*Mouse Adventure's live direction guide and action dock. Captured in a modded
+game; additional world content is not included with Mouse Adventure.*
+
 Click to advance dialogue or confirm supported menu and battle choices.
 Right-click to go back. The action dock provides clickable Game Boy controls
 below the play area, so you can interact, open menus, and navigate without
