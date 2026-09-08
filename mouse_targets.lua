@@ -43,6 +43,7 @@ return function(mod)
     "swapAnim", "swapFrom", "softboiledFrom", "actions", "held", "boxSwitching",
     "boxPicker", "current", "choosing", "selecting", "pending", "choicePushed",
     "moveSwapIndex", "mimicCtx", "player", "modernDexSearchOpen",
+    "scene", "pre", "finished", "exiting", "menuOpen",
     "modernPartyNamingCommand", "lower", "script"}
   local function context(game, s)
     local values, draw, update = {}, s.draw, s.update
@@ -80,10 +81,17 @@ return function(mod)
     local entries = {}
     if not s or not game.stack or game.stack:top() ~= s then return entries, false end
     if game.save and game.save.generation == 2 then return entries, false end
-    -- Demo-owned bag and text states are scripted too, not just the battle.
+    -- Demonstrations own their menu choices, but their dialogue still waits
+    -- for the player's normal A/B input (including Oak's Yellow capture).
+    local demo = false
     for _, owner in ipairs(game.stack.states or {}) do
-      if owner.isBattle and (owner.demo or owner.kind == "link") then return entries, false end
+      if owner.isBattle then
+        if owner.kind == "link" then return entries, false end
+        demo = demo or owner.demo
+      end
     end
+    if demo and not ((s.isBattle and s.phase == "messages")
+        or (s.boxTx and native(s, "render.TextBox"))) then return entries, false end
     local same = context(game, s)
     local function add(r, select, valid, button)
       if not r or r.w <= 0 or r.h <= 0 then return end
@@ -100,6 +108,41 @@ return function(mod)
         add(geometry(row, index), function() s[field] = index end,
           function() return valid() and (not extra or extra()) end)
       end
+    end
+
+    if native(s, "ui.TitleState") then
+      if s.phase == "loop" and not s.menuOpen then
+        add(rect(0, 0, 160, 144), nil)
+        return entries, entries[#entries].action
+      end
+      return entries, false
+    end
+    if native(s, "ui.IntroMovie") or native(s, "ui.YellowIntro") then
+      local pre, prePhase = s.pre, s.pre and s.pre.phase
+      local function ready()
+        return not s.finished and not s.exiting and s.phase ~= 4
+          and (s.pendingDelay or 0) <= 0
+          and s.pre == pre and (not pre or pre.phase == prePhase)
+      end
+      if ready() then
+        -- A skips only where the native intro permits it; copyright cards
+        -- and mandatory fades keep their normal timing.
+        add(rect(0, 0, 160, 144), nil, ready)
+        return entries, entries[#entries].action
+      end
+      return entries, false
+    end
+    -- ContinueInfo is private to TitleState. Its native parent and fixed
+    -- info-box contract distinguish it from arbitrary confirmation menus.
+    if s.title and native(s.title, "ui.TitleState") and type(s.save) == "table"
+        and s.title.menuOpen and type(s.titleUiBox) == "table" then
+      local b = s.titleUiBox
+      if b[1] == 4 and b[2] == 7 and b[3] == 19 and b[4] == 16 then
+        local title, save = s.title, s.save
+        add(rect(32, 56, 128, 80), nil,
+          function() return s.title == title and s.save == save and title.menuOpen end)
+      end
+      return entries, false
     end
 
     if s.modernPCUI and type(s.modernPCLayoutInfo) == "function" then
@@ -263,7 +306,7 @@ return function(mod)
 
     if s.isBattle then
       -- Load the large battle module only when a battle is already present.
-      if getmetatable(s) ~= class("battle.BattleState") or s.demo or s.kind == "link" then return entries, false end
+      if getmetatable(s) ~= class("battle.BattleState") or s.kind == "link" then return entries, false end
       local function ready()
         if s.demo or s.kind == "link" or s.animPlaying or s.waitingUI then return false end
         if s.phase == "menu" then
@@ -282,13 +325,21 @@ return function(mod)
         and underneath[s] == true and not exports("kanto_gear")
       local wide = s:wideLayout()
       if not ready() then
-        if visible and s.phase == "messages" and not s.animPlaying
+        local function dialogueReady()
+          return s.phase == "messages" and s.current and not s.animPlaying
+            and not s.waitingUI and not s.waitingSound and not s.draining
+            and (s.waitFrames or 0) <= 0 and (s.introSlide or 0) <= 0
             and ((s.msgWaiting and (s.msgPreWait or 0) <= 0)
-              or (s.msgPrompt and (s.msgPromptWait or 0) <= 0)) then
-          local current, shown = s.current, s.shown
+              or (s.msgPrompt and (s.msgPromptWait or 0) <= 0))
+        end
+        if visible and dialogueReady() then
+          local current, shown, line = s.current, s.shown, s.lineIndex
+          local waiting, prompt = s.msgWaiting, s.msgPrompt
           add(rect(0, wide and 104 or 96, wide and 304 or 160, wide and 40 or 48), nil,
-            function() return s.current == current and s.shown == shown
-              and not s.animPlaying and (s.msgWaiting or s.msgPrompt) end)
+            function() return dialogueReady() and s:bottomUIVisible()
+              and s.current == current and s.shown == shown and s.lineIndex == line
+              and s.msgWaiting == waiting and s.msgPrompt == prompt end)
+          return entries, entries[#entries].action
         end
         return entries, false
       end

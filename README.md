@@ -20,6 +20,8 @@ current tile step finishes normally.
 game; additional world content is not included with Mouse Adventure.*
 
 Click to advance dialogue or confirm supported menu and battle choices.
+Click an adjacent NPC, item ball, sign, or solid object to face and interact
+with it. Clerks and nurses can also be clicked across a single counter.
 Right-click to go back. The action dock provides clickable Game Boy controls
 below the play area, so you can interact, open menus, and navigate without
 reaching for the keyboard.
@@ -52,11 +54,19 @@ engine files, or other mods. The source ZIP is not a prepared mod release.
 
 ## Mouse controls
 
+- Click the intro or title screen to send A; mandatory startup animations
+  keep their normal timing. Click a main-menu row, then the Continue info
+  box to load an existing save.
 - Hold the left mouse button to move toward the cursor, relative to the player.
 - Drag while holding to steer up, down, left, right or along the four diagonals.
 - Release to stop issuing movement. The current tile step finishes normally.
 - Move the cursor onto the player to pause in the dead zone without releasing.
-- Click dialogue to send one normal A press. Scripted waits and sounds still apply.
+- Click a nearby NPC, item ball, sign, or solid scenery to face it and
+  interact once. Stand on a completed tile, directly beside the target
+  (not diagonally); a single counter can separate you from an NPC.
+- Click anywhere in the game view to advance a waiting dialogue prompt,
+  including battle messages and Oak's Yellow catching demonstration.
+  Scripted waits, animations, sounds, and automatic demonstration choices still apply.
 - Click a supported menu row or battle choice to select and confirm it.
 - Hover a supported choice to see a cyan outline of its clickable area.
 - Right-click to send B in menus, including backing out of move selection.
@@ -65,9 +75,12 @@ engine files, or other mods. The source ZIP is not a prepared mod release.
 - A touch held outside the engine's virtual controls works the same way.
 
 There is no destination tile or route queue: keep holding to keep moving.
-To speak to an NPC, read a sign, open a door requiring interaction, or use a
-field action, face it with steering or a dock arrow and click INTERACT / A.
-Arbitrary NPC clicks do not teleport, turn the player mid-step, or pathfind.
+Nearby object clicks use native D-pad turning followed by A, preserving
+dialogue, item capacity checks, scripts and save rules. Empty ground, water,
+and distant targets keep held steering; there is no automatic approach or
+repeated interaction while held. Clicking solid scenery attempts the normal
+interaction even when the tile has nothing to say. For other interactions
+and field actions, face the target and use INTERACT / A or the party menu.
 
 ## Action dock: mouse-only fallback
 

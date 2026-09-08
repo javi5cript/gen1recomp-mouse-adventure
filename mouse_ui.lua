@@ -135,8 +135,15 @@ return function(mod, movement)
         pending = nil
         tell("Action cancelled: the player has not stopped.")
       elseif not (action.state.isOverworld and action.state.player.moving) then
-        pending = nil
-        if not action.valid or action.valid() then
+        if action.valid and not action.valid() then
+          pending = nil
+        elseif action.direction and action.state.player.facing ~= action.direction then
+          -- A neutral native poll arms an in-place turn. B brakes Cycling
+          -- Road during that poll; neither facing nor position is mutated.
+          local button = action.state.player.turnArmed and action.direction or "b"
+          pulse = { mod.input:press(game, button) }
+        else
+          pending = nil
           if action.select then action.select() end
           if action.run then action.run(game) end
           if action.button then
@@ -257,9 +264,10 @@ return function(mod, movement)
       return true
     end
     if owns(ev) then
-      if ev.phase == "cancelled" or (ev.phase == "released"
-          and (ev.source == "touch" or ev.button == capture.button)) then
-        stopHold(ev.phase == "cancelled" or not contains(dock, ev.x, ev.y))
+      if ev.phase == "cancelled" then api.reset(); return true end
+      if ev.phase == "released"
+          and (ev.source == "touch" or ev.button == capture.button) then
+        stopHold(not contains(dock, ev.x, ev.y))
         capture = nil
         return true
       end
@@ -320,13 +328,19 @@ return function(mod, movement)
   mod.hooks:wrap("input.pointer", function(next, game, ev)
     if not active() or ev.phase ~= "pressed" or not ev.insideGame then return next(game, ev) end
     if ev.source == "mouse" and ev.button == 2 then
-      if movement.steering() then movement.cancel()
+      if movement.steering() or (pending and pending.direction) then
+        movement.cancel()
+        pending = nil
       else schedule(game, {button="b"}) end
       claim(ev)
       return true
     end
     if not (ev.source == "touch" or ev.button == 1) then return next(game, ev) end
     if capture then return true end
+    local interaction = movement.interaction(game, ev)
+    if interaction then
+      claim(ev); schedule(game, interaction); return true
+    end
     if sameContext(frame, game) then
       for _, entry in ipairs(frame.targets) do
         if contains(entry.rect, ev.gameX, ev.gameY) then

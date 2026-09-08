@@ -2,6 +2,7 @@ return function(mod)
   local Pipelines = require("src.render.Pipelines")
   local Tilt = require("src.render.Tilt")
   local Transition = require("src.render.Transition")
+  local Collision = require("src.world.Collision")
   local OCTANT = 0.4142135623730951
   local RETRY_TICKS = 12
   local pointer, token, anchor, viewport
@@ -154,11 +155,76 @@ return function(mod)
     return pointer and pointer.id == ev.id and pointer.source == ev.source
   end
 
+  local function interaction(game, ev)
+    local ow, r = mod.world:overworld(), game.renderer
+    if not (ow and top(game) == ow and ow.map and ow.camera and ow.player)
+        or (game.save and game.save.generation == 2) or not flat()
+        or not anchor or ow.player.moving or not finite(ev.gameX) or not finite(ev.gameY)
+        or not (r.wipeSx and r.wipeSy and r.wipeSx > 0 and r.wipeSy > 0)
+        or not ow.npcAtCell or not ow.map.signAtCell then return end
+    local p, map, save = ow.player, ow.map, game.save
+    local px, py = p.cellX, p.cellY
+    local wx = (ev.gameX - r.wipeWox) / r.wipeSx + math.floor(ow.camera.x)
+    local wy = (ev.gameY - r.wipeWoy) / r.wipeSy + math.floor(ow.camera.y)
+    local function hit(x, y)
+      return wx >= x and wx < x + 16 and wy >= y and wy < y + 16
+    end
+    local function action(dir, valid)
+      return {button="a", direction=dir, valid=function()
+        return top(game) == ow and ow.player == p and ow.map == map
+          and game.save == save and p.cellX == px and p.cellY == py
+          and not p.moving and flat() and valid()
+      end}
+    end
+    local function npcAt(x, y, d)
+      local npc = ow:npcAtCell(x, y)
+      if not npc and map:isCounterCell(x, y) then
+        npc = ow:npcAtCell(x + d[1], y + d[2])
+      end
+      return npc
+    end
+    -- Sprite heads sit four pixels above their map cell. Resolve sprites
+    -- before scenery, including the native one-counter interaction reach.
+    for _, dir in ipairs({"up", "down", "left", "right"}) do
+      local d = Collision.DELTA[dir]
+      local x, y = px + d[1], py + d[2]
+      if map:inBounds(x, y) then
+        local npc = npcAt(x, y, d)
+        if npc and not npc.hidden and npc.visible ~= false and not npc.moving
+            and hit(npc.px or npc.cellX * 16, (npc.py or npc.cellY * 16) - 4) then
+          return action(dir, function()
+            return npcAt(x, y, d) == npc and not npc.hidden
+              and npc.visible ~= false and not npc.moving
+          end)
+        end
+      end
+    end
+    for _, dir in ipairs({"up", "down", "left", "right"}) do
+      local d = Collision.DELTA[dir]
+      local x, y = px + d[1], py + d[2]
+      if map:inBounds(x, y) and hit(x * 16, y * 16) and not ow:npcAtCell(x, y) then
+        local sign = map:signAtCell(x, y)
+        if sign then
+          return action(dir, function()
+            return not ow:npcAtCell(x, y) and map:signAtCell(x, y) == sign
+          end)
+        end
+        -- Inspecting solid scenery uses A, not an event probe. The engine
+        -- resolves PCs, shelves, doors, hidden items and script-owned objects.
+        local function scenery()
+          return not ow:npcAtCell(x, y) and not map:isWalkableCell(x, y)
+            and not map:isWaterCell(x, y)
+        end
+        if scenery() then return action(dir, scenery) end
+      end
+    end
+  end
+
   local makeUI = assert((loadstring or load)(assert(mod:read("mouse_ui.lua")),
     "@click_to_move/mouse_ui.lua"))()
   local ui = makeUI(mod, {
     cancel = cancel, steering = function() return pointer ~= nil end,
-    enabled = enabled, top = top,
+    enabled = enabled, top = top, interaction = interaction,
   })
 
   mod.hooks:wrap("input.pointer", function(next, game, ev)
