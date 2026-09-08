@@ -33,13 +33,21 @@ reaching for the keyboard.
 
 ## Status and installation
 
-This repository contains the development source (manifest version 1.2.0).
-The local build workflow produces an installable ZIP, but a packaged public
-release has not been published yet. Broader compatibility testing is still needed;
-do not assume every replacement UI is directly clickable.
+Mouse Adventure **v1.2.0 (public beta)** is published. Download
+`click_to_move-1.2.0.zip` from the
+[releases page](https://github.com/javi5cript/gen1recomp-mouse-adventure/releases).
+Broader clean-game compatibility testing is ongoing; do not assume every
+replacement UI is directly clickable, and please report any screen that does not
+take clicks.
 
 Requires [Gen1Recomp](https://github.com/bryanthaboi/gen1recomp) and your own
 legally obtained game data. This is not a standalone game.
+
+**Install (recommended):** in the launcher, open **MODS -> Import mod .zip**,
+select `click_to_move-1.2.0.zip`, enable **Mouse Adventure**, and start Red,
+Blue, or Yellow. Keep overworld VOXEL and TILT off for held steering.
+
+**Manual install (alternative):**
 
 1. Close the game and back up any existing `mods\click_to_move` folder.
 2. Create `click_to_move` inside the engine's user-data `mods` directory.
@@ -53,10 +61,11 @@ To uninstall, close the game and remove only `mods\click_to_move`, or disable
 Mouse Adventure in the mod manager. Leave saves, carts, and other mods alone.
 Existing installations retain the `click_to_move` ID and option keys.
 
-GitHub's automatic source ZIP contains a repository wrapper folder. For an
-installable mod archive, package the seven files above directly at the ZIP
-root and name it `click_to_move-1.2.0.zip`; do not include `.git`, ROMs, saves,
-engine files, or other mods. The source ZIP is not a prepared mod release.
+The release asset `click_to_move-1.2.0.zip` is already packaged this way, with
+the seven files at the archive root. GitHub's automatic *source* ZIP is
+different: it wraps everything in a repository folder and is not an installable
+mod release. If you build your own archive, package the seven files directly at
+the ZIP root and do not include `.git`, ROMs, saves, engine files, or other mods.
 
 ## Development workflow
 
