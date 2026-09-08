@@ -1,0 +1,26 @@
+# Local game data and build artifacts must never be published.
+*.gb
+*.gbc
+*.gba
+*.nds
+*.sav
+*.srm
+*.state
+*.zip
+*.exe
+*.dll
+*.love
+*.log
+.env
+.env.*
+!.env.example
+/options.lua
+/saves/
+/save/
+/roms/
+/carts/
+/mods/
+/dist/
+/node_modules/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,18 @@
+{
+  "id": "click_to_move",
+  "name": "Mouse Adventure",
+  "version": "1.2.0",
+  "github": "javi5cript/gen1recomp-mouse-adventure",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "category": "QOL",
+  "games": ["gen1"],
+  "game_version": ">=0.2.56 <2.0.0",
+  "priority": 100,
+  "dependencies": [],
+  "optional_dependencies": [],
+  "conflicts": [],
+  "permissions": ["engine_internals"],
+  "description": "Mouse-first Pokemon: hold and drag for eight-direction steering, click dialogue and supported menu choices, right-click to go back. A reserved action dock provides all eight Game Boy buttons, Mods, and optional Wilds hold-to-throw controls. Preserves native battles, collision, map transitions and save confirmations."
+}
