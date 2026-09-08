@@ -8,38 +8,16 @@ Maintained by [javi5cript](https://github.com/javi5cript).
 Mod code is licensed under [MIT](LICENSE), with upstream acknowledgments and notices in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## In-game screenshots
+## Mouse Adventure at a glance
 
-Captured in Blue / Ultimate Kanto with additional mods enabled. The overworld
-Pokemon and modern party artwork come from that setup, not Mouse Adventure.
+**Hold left-click and drag to steer in eight directions.** A live line and
+arrow show your steering direction. Release to stop issuing movement; the
+current tile step finishes normally.
 
-### Hold and steer
-
-**Hold left-click and drag to steer.** The live white line and arrow run from
-the player toward the pointer, showing the current steering direction.
-This is the mod's actual in-game guide, not an arrow added to the screenshot.
-Release to stop issuing movement; the current tile step finishes normally.
-
-![Mouse Adventure showing its live diagonal steering line and arrow, with the mouse action dock below the overworld](docs/screenshots/held-steering.png)
-
-### Mouse-only menus
-
-Open the native menu with **MENU**, click supported choices, and use
-**BACK / B** or right-click to return. The dock stays below the play area.
-The extra menu entries shown here belong to the installed custom-cart mods.
-
-![Native menu open above Mouse Adventure's Confirm, Back, Menu and directional controls](docs/screenshots/menu-controls.png)
-
-### Modern party screen
-
-The controller dock remains available on the party screen, with direct card
-selection supported by the Modern Party UI adapter.
-
-![Modern Party UI with five Pokemon and Mouse Adventure's controller dock underneath](docs/screenshots/party-controls.png)
-
-Screenshots document compatibility and gameplay. Depicted game and
-third-party artwork belongs to its respective owners and is not covered by
-this repository's MIT license.
+Click to advance dialogue or confirm supported menu and battle choices.
+Right-click to go back. The action dock provides clickable Game Boy controls
+below the play area, so you can interact, open menus, and navigate without
+reaching for the keyboard.
 
 ## Status and installation
 

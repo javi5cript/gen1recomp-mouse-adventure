@@ -9,11 +9,11 @@ projects below. Their MIT notices are retained for the corresponding
 compatibility work. No complete upstream mod, source image or sound asset,
 engine module, or ROM data is distributed here.
 
-The gameplay screenshots in `docs/screenshots` document the mod running with
-Blue / Ultimate Kanto and other installed mods. Depicted game and third-party
-artwork retains its respective ownership and licensing; this repository's
-MIT license does not apply to that artwork. Screenshots are documentation,
-not a source of assets licensed for reuse.
+Gameplay screenshots in earlier revisions depicted Blue / Ultimate Kanto and
+other installed mods. Those images have been removed from the current
+documentation. Depicted game and third-party artwork retains its respective
+ownership and licensing; this repository's MIT license does not apply to that
+artwork, including in repository history.
 
 | Project | Source | Copyright notice |
 | --- | --- | --- |
