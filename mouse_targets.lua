@@ -110,6 +110,30 @@ return function(mod)
       end
     end
 
+    -- Level-up stats window (BattleState.StatBox / PrintStatsBox): a small
+    -- state pushed over the battle that vanilla dismisses with A/B. It is not
+    -- the battle state itself, so the isBattle branch never sees it; without
+    -- this a click cannot advance the "grew to level" stat card. Any click
+    -- sends A, matching the box's own dismissal.
+    do
+      local ok, battle = pcall(class, "battle.BattleState")
+      if ok and battle and battle.StatBox and getmetatable(s) == battle.StatBox then
+        add(rect(0, 0, 160, 144), nil, nil, "a")
+        return entries, entries[#entries].action
+      end
+    end
+
+    -- Pokedex data page (ui.DexEntryMenu): pushed over the battle after a new
+    -- species is caught. Vanilla advances each page -- and finally pops -- on
+    -- A/B; it is its own state, so the isBattle branch never sees it. Without
+    -- this a click cannot dismiss the "New POKeDEX data" screen. Any click
+    -- sends A, matching the page's own advance/close. (Input is ignored while
+    -- the cry plays, exactly as with the keyboard, so a click then is a no-op.)
+    if native(s, "ui.DexEntryMenu") then
+      add(rect(0, 0, 160, 144), nil, nil, "a")
+      return entries, entries[#entries].action
+    end
+
     if native(s, "ui.TitleState") then
       if s.phase == "loop" and not s.menuOpen then
         add(rect(0, 0, 160, 144), nil)

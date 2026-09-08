@@ -55,6 +55,8 @@ if you want the installed copy to match that commit exactly.
 | `.\scripts\dev.ps1 -Task Build` | Test, then write `dist\click_to_move-<version>.zip` |
 | `.\scripts\dev.ps1 -Task Install` | Test, build, back up and install to `%APPDATA%\pokemon-love2d\mods\click_to_move` |
 | `.\scripts\dev.ps1 -Task Run -Game yellow` | Install, start Yellow, and wait until the game closes |
+| `.\scripts\dev.ps1 -Task Smoke -AllGames` | Test/build, then run isolated Red, Blue and Yellow opening scenarios |
+| `.\scripts\dev.ps1 -Task Smoke -Game red` | Run only the Red opening scenario |
 
 Run also accepts `red` or `blue`. Use Run from a visible terminal when you
 want to keep the game open. Neither Install nor Run closes a running game:
@@ -92,6 +94,55 @@ Include Red, Blue and Yellow; intro/title/Continue; NPCs, signs, item balls,
 counters and scenery; dialogue and Oak's Yellow catching demonstration;
 menu/battle/naming controls; held movement across doors and map connections.
 Preserve saves and do not replace the user's mod settings automatically.
+
+## Automated opening playthrough
+
+Use Node.js 18 or newer and the normal, non-portable Windows game installation:
+
+```powershell
+.\scripts\dev.ps1 -Task Smoke -AllGames
+# For a focused iteration:
+.\scripts\dev.ps1 -Task Smoke -Game yellow
+```
+
+The smoke runner uses the engine's existing `POKEPORT_DRIVER` frame-driver
+interface, not its startup-skipping autopilot. It starts the real executable,
+renders the real game, and sends left/right mouse press, move and release
+callbacks through the same LOVE handlers that Mouse Adventure receives.
+It never sets player position/facing, names, inventory, event flags, party,
+battle decisions or damage directly.
+
+Each game gets a fresh, unique `mouse-adventure-smoke-<game>-<uuid>` profile
+under `%APPDATA%`. Only that game's already-imported `data`, `assets` and cache
+marker are copied from the live profile, plus the repository mod and dedicated
+test settings. No existing saves or other mods are copied. Portable mode is
+refused because it bypasses LOVE's isolated save identity. Normal installed
+mods, options and saves are not modified.
+
+The route starts at the intro/title, chooses NEW GAME, types ASH and GARY
+on the mouse naming grid, withdraws the bedroom PC's Potion, goes downstairs
+and outside, triggers Oak at the northern grass, obtains Charmander in Red,
+Squirtle in Blue or Pikachu in Yellow, then completes the first rival battle.
+The run stops there, without continuing the adventure. Battle outcomes are
+observed, not forced; this is an input/progression test, not a guaranteed-win
+or battle-balance test.
+
+Reports live in `.dev-cache\smoke\<run>\<game>`. `environment.json` records the
+isolated profile and source/executable hashes. `result.json` records milestones,
+state and any failure; `engine.log` contains engine output. Milestone/failure
+screenshots are copied to `screenshots`. The all-game command attempts all
+three scenarios and returns a failure exit code if any fails.
+
+Runs have bounded stage waits and a ten-minute per-process watchdog. A timeout
+stops only the test process that the runner launched. The game windows open
+normally; avoid interacting with them while the driver is active. Isolated
+profiles and reports are retained locally for debugging, never committed or
+shipped in the mod ZIP.
+
+This covers the specified fresh-game opening at centered UI layout and normal
+speed, with native animations enabled and audio muted. It does not cover OS
+mouse hardware delivery, other UI layouts, every script or later-game behavior.
+It complements, rather than replaces, the headless controls regressions.
 
 ## Product language and compatibility
 

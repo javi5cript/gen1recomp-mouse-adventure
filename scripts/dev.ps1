@@ -1,14 +1,16 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [ValidateSet('Test', 'Build', 'Install', 'Run')]
+    [ValidateSet('Test', 'Build', 'Install', 'Run', 'Smoke')]
     [string]$Task = 'Test',
     [string]$GameDirectory,
     [ValidateSet('red', 'blue', 'yellow')]
-    [string]$Game = 'yellow'
+    [string]$Game = 'yellow',
+    [switch]$AllGames
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if ($AllGames -and $Task -ne 'Smoke') { throw '-AllGames is only supported with -Task Smoke.' }
 $root = Split-Path -Parent $PSScriptRoot
 $configPath = Join-Path $root '.dev.local.json'
 if (!$GameDirectory) {
@@ -167,6 +169,12 @@ try {
 if ($Task -eq 'Test') { return }
 $package = New-ModPackage
 if ($Task -eq 'Build') { return }
+if ($Task -eq 'Smoke') {
+    $selection = if ($AllGames) { 'all' } else { $Game }
+    & node (Join-Path $root 'tests\opening\run.js') $exe $selection
+    if ($LASTEXITCODE -ne 0) { throw 'Opening smoke run failed; see its report under .dev-cache\smoke.' }
+    return
+}
 Install-Mod $package
 if ($Task -eq 'Run') {
     $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) `

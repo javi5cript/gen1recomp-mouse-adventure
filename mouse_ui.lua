@@ -247,6 +247,9 @@ return function(mod, movement)
     end
     g.setColor(0.65, 0.78, 0.84, 1)
     local hint = notice or "Hold left: move   |   Click: choose / talk   |   Right: back   |   MENU: save / party / bag"
+    if not notice and movement.enabled("guide_hotkey") then
+      hint = hint .. "   |   G: guide " .. (movement.guideVisible() and "ON" or "OFF")
+    end
     local scale = math.min(1, (dock.w-12)/math.max(1, font:getWidth(hint)))
     g.print(hint, dock.x+6, dock.y+dock.h-19, 0, scale, scale)
     g.pop()

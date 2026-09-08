@@ -1,4 +1,4 @@
-# Mouse Adventure 1.2.0
+# Mouse Adventure 1.3.0
 
 **Hold to move. Point to steer. Click to interact.**
 
@@ -31,10 +31,19 @@ Right-click to go back. The action dock provides clickable Game Boy controls
 below the play area, so you can interact, open menus, and navigate without
 reaching for the keyboard.
 
+**Works with tilt and the voxel orbit.** Held steering and click-to-interact
+now run in the flat 2D overworld, the engine's TILT view, and the voxel mod's
+orbit/diorama levels (1-5). These cameras only pitch down from the south with
+no yaw, so world east/west stays screen left/right and north/south stays
+up/down; steering points relative to the centre of the view. The free-look
+voxel cameras (first-person level 6 and third-person level 7) have no fixed
+mapping and are not supported -- the mod steps aside and logs a warning there
+rather than moving you the wrong way.
+
 ## Status and installation
 
-Mouse Adventure **v1.2.0 (public beta)** is published. Download
-`click_to_move-1.2.0.zip` from the
+Mouse Adventure **v1.3.0 (public beta)** is published. Download
+`click_to_move-1.3.0.zip` from the
 [releases page](https://github.com/javi5cript/gen1recomp-mouse-adventure/releases).
 Broader clean-game compatibility testing is ongoing; do not assume every
 replacement UI is directly clickable, and please report any screen that does not
@@ -44,8 +53,9 @@ Requires [Gen1Recomp](https://github.com/bryanthaboi/gen1recomp) and your own
 legally obtained game data. This is not a standalone game.
 
 **Install (recommended):** in the launcher, open **MODS -> Import mod .zip**,
-select `click_to_move-1.2.0.zip`, enable **Mouse Adventure**, and start Red,
-Blue, or Yellow. Keep overworld VOXEL and TILT off for held steering.
+select `click_to_move-1.3.0.zip`, enable **Mouse Adventure**, and start Red,
+Blue, or Yellow. Held steering runs in the flat, TILT, and voxel-orbit
+overworlds; only the free-look voxel cameras (levels 6 and 7) are unsupported.
 
 **Manual install (alternative):**
 
@@ -55,13 +65,13 @@ Blue, or Yellow. Keep overworld VOXEL and TILT off for held steering.
 3. Copy `manifest.json`, `main.lua`, `mouse_ui.lua`, `mouse_targets.lua`,
    `README.md`, `LICENSE`, and `THIRD_PARTY_NOTICES.md` into that folder.
 4. Start Red, Blue, or Yellow and enable **Mouse Adventure** in the mod manager.
-   Keep overworld VOXEL and TILT off for held steering.
+   Held steering runs in the flat, TILT, and voxel-orbit overworlds.
 
 To uninstall, close the game and remove only `mods\click_to_move`, or disable
 Mouse Adventure in the mod manager. Leave saves, carts, and other mods alone.
 Existing installations retain the `click_to_move` ID and option keys.
 
-The release asset `click_to_move-1.2.0.zip` is already packaged this way, with
+The release asset `click_to_move-1.3.0.zip` is already packaged this way, with
 the seven files at the archive root. GitHub's automatic *source* ZIP is
 different: it wraps everything in a repository folder and is not an installable
 mod release. If you build your own archive, package the seven files directly at
@@ -120,6 +130,9 @@ does not imply destination-based pathfinding.
 - Hover a supported choice to see a cyan outline of its clickable area.
 - Right-click to send B in menus, including backing out of move selection.
 - Right-click during steering cancels movement instead of also interacting.
+- Press G in the overworld to hide or show the steering line and arrow. The
+  saved STEERING GUIDE option sets the startup state; the hotkey flips it on
+  the fly and never fires while naming or in a menu.
 - Keyboard/controller input takes priority over pending mouse actions.
 - A touch held outside the engine's virtual controls works the same way.
 
@@ -248,14 +261,38 @@ Open this mod's settings in the mod manager.
 | DEAD ZONE | 6 | Pause radius around the player, in world pixels (2-16) |
 | MOUSE MENUS AND DIALOGUE | ON | Enables UI clicks, contextual B and the dock |
 | MOUSE ACTION BAR | ON | Reserves space for visible controller and Wilds controls |
+| GUIDE HOTKEY (G) | ON | Lets the G key hide or show the steering guide in the overworld |
 
 ## Compatibility
 
 Requires Gen1Recomp 0.2.56 or later in the pre-2.0 series.
-Use the flat overworld with VOXEL and TILT off. Perspective rendering is not
-supported: the mod rejects steering and logs a warning instead of moving in
-the wrong direction. Standard zoom and high-DPI rendering use the engine's
+
+Held steering and click-to-interact work in three overworld cameras:
+
+- the flat 2D blit (default),
+- the engine's **TILT** view, and
+- the **voxel** mod's orbit/diorama levels 1-5.
+
+All three pitch down from the south without yaw, so the mod steers relative to
+the centre of the view. Standard zoom and high-DPI rendering use the engine's
 actual world-blit coordinates rather than the UI rectangle.
+
+Known limitations:
+
+- **Free-look voxel cameras are unsupported.** Voxel first-person (level 6) and
+  third-person free-cam (level 7) rotate the yaw freely, so screen directions no
+  longer map to fixed world directions. In these modes the mod stops steering
+  and logs a warning instead of moving you the wrong way; use the voxel mod's
+  own look/move controls there.
+- **Tilt and voxel-orbit interaction is directional.** Clicking an adjacent NPC,
+  sign, or object resolves the click to one of the four cardinal neighbours and
+  faces that way. Pixel-accurate targeting of a specific on-screen sprite is
+  only used in the flat overworld.
+- **Steering anchors on the view centre** under tilt and voxel-orbit, which
+  assumes the player is roughly centred. Accuracy can degrade at map edges where
+  the camera stops following.
+- **Replacement UIs are not guaranteed clickable.** Third-party battle and menu
+  UIs that redraw their own screens may not expose click targets.
 
 The folder/id remains `click_to_move`, preserving existing enablement and
 steering settings. Install all three Lua files (`main.lua`, `mouse_ui.lua`,

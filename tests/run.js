@@ -63,6 +63,9 @@ const luaparse = require('luaparse');
     for (const name of ['main.lua', 'mouse_ui.lua', 'mouse_targets.lua']) {
       luaparse.parse(fs.readFileSync(path.join(modRoot, name), 'utf8'), {luaVersion: '5.1'});
     }
+    for (const name of ['driver.lua', 'options.lua']) {
+      luaparse.parse(fs.readFileSync(path.join(__dirname, 'opening', name), 'utf8'), {luaVersion: '5.1'});
+    }
     lua.global.set('MOD_SOURCE', fs.readFileSync(
       path.join(modRoot, 'main.lua'), 'utf8'));
     lua.global.set('MOD_FILES', Object.fromEntries(

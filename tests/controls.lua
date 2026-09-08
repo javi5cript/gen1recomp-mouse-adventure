@@ -32,6 +32,12 @@ package.preload["src.render.HudTiles"] = function() return {} end
 package.preload["src.battle.UIVisibility"] = function()
   return {bottomVisible=function() return true end}
 end
+package.preload["src.battle.BattleState"] = function()
+  return { StatBox = {} }
+end
+package.preload["src.ui.DexEntryMenu"] = function()
+  local M = {}; M.__index = M; function M.draw() end; return M
+end
 package.preload["src.core.Strings"] = function()
   return function(text, ...) return select("#",...)>0 and string.format(text,...) or text end
 end
@@ -57,12 +63,15 @@ end
 package.preload["src.render.SpriteRenderer"] = function()
   return { new = function() return {} end }
 end
-local tilted, projected = false, false
+local tilted, projected, voxelLevel = false, false, 3
 package.preload["src.render.Tilt"] = function()
   return { active = function() return tilted end }
 end
 package.preload["src.render.Pipelines"] = function()
-  return { worldPipeline = function() return projected and "voxel" or nil end }
+  return {
+    worldPipeline = function() return projected and "voxel" or nil end,
+    level = function(id) return id == "voxel" and voxelLevel or 0 end,
+  }
 end
 love = { graphics = {
   getColor = function() return 1, 1, 1, 1 end,
@@ -109,7 +118,7 @@ local function render()
   hooks:call("render.hud", noop, game, rect)
 end
 local function setup()
-  warnings, tilted, projected = {}, false, false
+  warnings, tilted, projected, voxelLevel = {}, false, false, 3
   holds, options, events, steps, registry = {}, {}, {}, {}, {}
   hooks = Hooks.new()
   game = { data = { sprites = { player = {} }, field = {} }, save = {},
@@ -156,6 +165,7 @@ local function setup()
     for _, row in ipairs(rows) do options[row.key] = row.default end
   end
   function mod.options:get(key) return options[key] end
+  function mod.options:set(key, value) options[key] = value end
   function mod:read(name) return MOD_FILES[name] end
   function mod.find(id) return registry[id] end
   function mod.events:on(name, callback) events[name] = callback end
@@ -377,20 +387,35 @@ test("game-ready clears stale capture", function()
   pointer("pressed"); tick(10); events["game.ready"]()
   noHold(); tick(60); eq(ow.player.cellX, 51)
 end)
-test("projected view rejects input and explains why", function()
-  projected = true
+test("free-look voxel camera rejects input and explains why", function()
+  projected = true; voxelLevel = 6
   eq(pointer("pressed"), false)
   eq(#warnings, 1)
   warnings = {}
   tick(40); eq(#steps, 0)
 end)
-test("enabling perspective during steering cancels hold", function()
+test("switching to free-look during steering cancels hold", function()
   pointer("pressed"); tick(10)
-  tilted = true
+  projected = true; voxelLevel = 7
   hooks:call("input.step", noop, game, 1/60)
   noHold(); eq(#warnings, 1); warnings = {}
-  tilted = false; tick(50); eq(ow.player.cellX, 51)
+  projected = false; tick(50); eq(ow.player.cellX, 51)
 end)
+for _, case in ipairs({
+  {"tilt east", "tilt", 700, 360, "right"},
+  {"tilt south", "tilt", 480, 580, "down"},
+  {"voxel-orbit west", "voxel", 260, 360, "left"},
+  {"voxel-orbit north", "voxel", 480, 140, "up"},
+}) do
+  test("centre-anchor steering drives " .. case[1], function()
+    if case[2] == "tilt" then tilted = true else projected = true end
+    render()
+    pointer("pressed", nil, nil, {gameX = case[3], gameY = case[4]})
+    tick(120)
+    assert(#steps >= 4, "held steering stopped")
+    for _, step in ipairs(steps) do eq(step, case[5]) end
+  end)
+end
 test("invalid drag clears input and reports", function()
   pointer("pressed"); tick(10)
   pointer("moved", nil, nil, {gameX=0/0})
@@ -458,6 +483,18 @@ for _,case in ipairs({{"up",0,-1},{"down",0,1},{"left",-1,0},{"right",1,0}}) do
     ow.player.turnArmed=false
     pointer("pressed",case[2]*16,case[3]*16)
     pointer("released",case[2]*16,case[3]*16); tick(5)
+    eq(ow.player.facing,case[1]); eq(calls[1],npc); eq(#calls,1)
+    eq(ow.player.cellX,50); eq(ow.player.cellY,50); eq(#steps,0); noHold()
+  end)
+end
+for _,case in ipairs({{"up",0,-1,480,140},{"down",0,1,480,580},{"left",-1,0,260,360},{"right",1,0,700,360}}) do
+  test("voxel-orbit NPC click faces "..case[1].." via direction",function()
+    projected=true
+    local npc,calls=worldFixture(case[2],case[3])
+    ow.player.turnArmed=false
+    render()
+    pointer("pressed",nil,nil,{gameX=case[4],gameY=case[5]})
+    pointer("released",nil,nil,{gameX=case[4],gameY=case[5]}); tick(5)
     eq(ow.player.facing,case[1]); eq(calls[1],npc); eq(#calls,1)
     eq(ow.player.cellX,50); eq(ow.player.cellY,50); eq(#steps,0); noHold()
   end)
@@ -749,6 +786,24 @@ test("unrecognised menu clicks do not blindly confirm",function()
   uiFrame({update=function() if game.input:wasPressed("a") then pressed=true end end})
   eq(clickUI(25,30),false); assert(not pressed)
 end)
+test("level-up stat card click sends A to dismiss it",function()
+  local StatBox=require("src.battle.BattleState").StatBox
+  local dismissed=false
+  local card=setmetatable({game=game,
+    update=function() if game.input:wasPressed("a") then dismissed=true end end},StatBox)
+  uiFrame(card)
+  assert(clickUI(80,60)); tick()
+  assert(dismissed)
+end)
+test("caught Pokedex data page click sends A to advance and close it",function()
+  local DexEntryMenu=require("src.ui.DexEntryMenu")
+  local advanced=false
+  local page=setmetatable({game=game,
+    update=function() if game.input:wasPressed("a") then advanced=true end end},DexEntryMenu)
+  uiFrame(page)
+  assert(clickUI(80,60)); tick()
+  assert(advanced)
+end)
 test("pending input cannot cross a battle phase on same state",function()
   local state={phase="menu",update=function() end}
   uiFrame(state)
@@ -995,5 +1050,21 @@ test("choice that changes before the tick cannot leak A",function()
   uiFrame(box); uiPointer("pressed",80+132*3,30+82*2)
   box.pending=true; box.holdFrames=15; tick()
   assert(not game.input:wasPressed("a")); eq(box.pending,true)
+end)
+test("G hotkey toggles the steering guide option in the overworld",function()
+  eq(options.marker,true)
+  game:keypressed("g"); eq(options.marker,false)
+  game:keypressed("g"); eq(options.marker,true)
+end)
+test("G hotkey does nothing when the guide hotkey option is off",function()
+  options.guide_hotkey=false
+  game:keypressed("g"); eq(options.marker,true)
+end)
+test("G hotkey is ignored outside the overworld",function()
+  game.stack:push({menu=true})
+  game:keypressed("g"); eq(options.marker,true)
+end)
+test("other keys never toggle the steering guide",function()
+  game:keypressed("x"); eq(options.marker,true)
 end)
 print(string.format("%d tests passed", count))
